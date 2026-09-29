@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -128,8 +129,8 @@ func TestUploadPermissionsAndRace(t *testing.T) {
 	if c := put("new", "a"); c != 200 {
 		t.Fatalf("upload got %d", c)
 	}
-	if fi, _ := os.Stat(files + "/new"); fi.Mode().Perm() != 0o644 {
-		t.Fatalf("new file mode %v, want 0644", fi.Mode().Perm())
+	if fi, _ := os.Stat(files + "/new"); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("new file mode %v, want 0600", fi.Mode().Perm())
 	}
 	_ = os.Chmod(files+"/new", 0o755)
 	if c := put("new&overwrite=1", "b"); c != 200 {
@@ -456,5 +457,125 @@ func TestNewSessionStartsInHome(t *testing.T) {
 	out, _ := exec.Command("tmux", "list-panes", "-t", "=homey", "-F", "#{pane_current_path}").Output()
 	if got := strings.TrimSpace(string(out)); got != home {
 		t.Fatalf("start dir = %q, want %q", got, home)
+	}
+}
+
+func TestRevokeClosesLiveTerminal(t *testing.T) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		t.Skip("tmux not installed")
+	}
+	isolatedTmux(t)
+	old := revokeInterval
+	revokeInterval = 50 * time.Millisecond
+	defer func() { revokeInterval = old }()
+	ts, st, _ := setup(t)
+	dev := pairDevice(t, ts, st)
+
+	uri := "/ws?session=revoketest&cols=80&rows=24"
+	h := http.Header{"Authorization": {signHeader(dev, "GET", strings.TrimPrefix(ts.URL, "http://"), uri)}}
+	c, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(ts.URL, "http")+uri, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if ok, err := st.Revoke(dev.id); !ok || err != nil {
+		t.Fatalf("revoke: %v %v", ok, err)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	for {
+		if _, _, err := c.ReadMessage(); err != nil {
+			if ne, ok := err.(interface{ Timeout() bool }); ok && ne.Timeout() {
+				t.Fatal("connection still open after revoke")
+			}
+			return
+		}
+	}
+}
+
+func TestLookupUnknownIDSkipsStateLock(t *testing.T) {
+	st, _ := NewStore(t.TempDir())
+	id, err := st.AddKey("a", testPub())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dev, _ := st.Lookup(id); dev == nil {
+		t.Fatal("known device not found")
+	}
+	unlock, err := st.lockState() // simulate another process mid-write
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	done := make(chan *Device, 1)
+	go func() { d, _ := st.Lookup("deadbeef"); done <- d }()
+	select {
+	case d := <-done:
+		if d != nil {
+			t.Fatal("unknown id found")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Lookup of an unknown id waited for the state lock")
+	}
+}
+
+func TestLookupSeesRevokeAndAdd(t *testing.T) {
+	st, _ := NewStore(t.TempDir())
+	id, _ := st.AddKey("a", testPub())
+	if d, _ := st.Lookup(id); d == nil {
+		t.Fatal("not found")
+	}
+	if ok, _ := st.Revoke(id); !ok {
+		t.Fatal("revoke failed")
+	}
+	if d, _ := st.Lookup(id); d != nil {
+		t.Fatal("revoked device still found")
+	}
+	id2, _ := st.AddKey("b", testPub())
+	if d, _ := st.Lookup(id2); d == nil {
+		t.Fatal("new device not found")
+	}
+}
+
+func TestPairBodyReadDeadline(t *testing.T) {
+	old := pairBodyTimeout
+	pairBodyTimeout = 200 * time.Millisecond
+	defer func() { pairBodyTimeout = old }()
+	ts, _, _ := setup(t)
+	c, err := net.Dial("tcp", strings.TrimPrefix(ts.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	fmt.Fprint(c, "POST /pair HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\n{") // then stall
+	_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := io.ReadAll(c); err != nil {
+		t.Fatalf("server held the stalled /pair body open: %v", err)
+	}
+}
+
+func TestLimiterKeysIPv6ByPrefix(t *testing.T) {
+	l := newLimiter(3, time.Minute)
+	for i := 0; i < 3; i++ {
+		l.fail(fmt.Sprintf("2001:db8:1:2::%x", i+1)) // three hosts in one /64
+	}
+	if !l.blocked("2001:db8:1:2:ffff::9") {
+		t.Fatal("another address in the same /64 is not blocked")
+	}
+	if l.blocked("2001:db8:1:3::1") {
+		t.Fatal("a different /64 is blocked")
+	}
+	l.fail("10.0.0.1")
+	if l.blocked("10.0.0.2") {
+		t.Fatal("IPv4 addresses must stay separate")
+	}
+}
+
+func TestLimiterSweepIsThrottled(t *testing.T) {
+	l := newLimiter(3, time.Hour) // sweeps at most every window/10
+	l.fail("1.1.1.1")
+	l.m["1.1.1.1"].start = time.Now().Add(-2 * time.Hour) // expired
+	l.fail("2.2.2.2")
+	if _, ok := l.m["1.1.1.1"]; !ok {
+		t.Fatal("swept again straight after the last sweep")
 	}
 }

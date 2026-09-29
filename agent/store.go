@@ -51,6 +51,16 @@ type storeData struct {
 type Store struct {
 	mu   sync.Mutex
 	path string
+
+	// Lookup cache, valid while state.json is the same file with the same mtime.
+	// Lets requests for unknown or already-seen devices skip the file lock and parse.
+	cacheInfo os.FileInfo
+	cache     map[string]cachedDev
+}
+
+type cachedDev struct {
+	dev Device
+	pk  *ecdsa.PublicKey
 }
 
 // lockState takes the exclusive file lock for the duration of a state
@@ -239,10 +249,42 @@ func (s *Store) AddKey(name, pubkey string) (string, error) {
 	return id, s.save(d)
 }
 
+// cacheFresh reports whether the cache still matches state.json on disk.
+func (s *Store) cacheFresh() bool {
+	fi, err := os.Stat(s.path)
+	return err == nil && s.cacheInfo != nil && os.SameFile(fi, s.cacheInfo) && fi.ModTime().Equal(s.cacheInfo.ModTime())
+}
+
+// refill rebuilds the cache from d. Call it holding the state lock, so the file can't change under it.
+func (s *Store) refill(d *storeData) {
+	fi, err := os.Stat(s.path)
+	if err != nil {
+		s.cacheInfo, s.cache = nil, nil
+		return
+	}
+	c := make(map[string]cachedDev, len(d.Devices))
+	for _, dev := range d.Devices {
+		if pk, err := ParsePubKey(dev.PubKey); err == nil {
+			c[dev.ID] = cachedDev{dev, pk}
+		}
+	}
+	s.cacheInfo, s.cache = fi, c
+}
+
 // Lookup returns the device with the given id and its parsed public key.
 func (s *Store) Lookup(id string) (*Device, *ecdsa.PublicKey) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.cacheFresh() {
+		e, ok := s.cache[id]
+		if !ok {
+			return nil, nil
+		}
+		if time.Since(e.dev.LastSeen) <= lastSeenStep {
+			dev := e.dev
+			return &dev, e.pk
+		}
+	}
 	unlock, err := s.lockState()
 	if err != nil {
 		return nil, nil
@@ -252,6 +294,7 @@ func (s *Store) Lookup(id string) (*Device, *ecdsa.PublicKey) {
 	if err != nil {
 		return nil, nil
 	}
+	defer s.refill(d)
 	for i := range d.Devices {
 		if d.Devices[i].ID == id {
 			pk, err := ParsePubKey(d.Devices[i].PubKey)
