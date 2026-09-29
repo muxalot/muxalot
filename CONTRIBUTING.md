@@ -29,15 +29,16 @@ The version comes from git tags only (`vX.Y.Z`). Maintainers release with `make 
 Signing keys stay on the maintainer's machine. Create them once and describe them in `app/keystore.properties` (gitignored):
 
 ```sh
-keytool -genkeypair -keystore ~/keys/muxalot-apk.jks -alias apk -keyalg EC -groupname secp256r1 -validity 10000
-keytool -genkeypair -keystore ~/keys/muxalot-play.jks -alias play -keyalg EC -groupname secp256r1 -validity 10000
+keytool -genkeypair -keystore ~/keystores/muxalot-apk.jks -alias apk -keyalg RSA -keysize 4096 -validity 10000
+keytool -genkeypair -keystore ~/keystores/muxalot-play.jks -alias play -keyalg RSA -keysize 4096 -validity 10000
 ```
+Use RSA (Play accepts RSA keys everywhere) and a validity of 10000 days (about 27 years). Keep the keystores outside the repo.
 ```properties
-apk.storeFile=/home/you/keys/muxalot-apk.jks
+apk.storeFile=/home/you/keystores/muxalot-apk.jks
 apk.storePassword=...
 apk.keyAlias=apk
 apk.keyPassword=...
-play.storeFile=/home/you/keys/muxalot-play.jks
+play.storeFile=/home/you/keystores/muxalot-play.jks
 play.storePassword=...
 play.keyAlias=play
 play.keyPassword=...
