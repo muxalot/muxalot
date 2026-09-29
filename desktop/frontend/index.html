@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>muxalot</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="banner" role="status" aria-live="polite" hidden></div>
+
+<main id="pair" hidden>
+  <form id="pair-form">
+    <h1>Pair with a server</h1>
+    <p class="hint">On the server run <code>muxalot-agent pair --url https://your.host</code>, then enter the URL and code (or paste the <code>muxalot://pair</code> link into the URL field).</p>
+    <label>Server URL or pairing link <input id="p-url" autocomplete="off" spellcheck="false" placeholder="https://tty.example.com"></label>
+    <label>Pairing code <input id="p-code" autocomplete="off" spellcheck="false"></label>
+    <label>Device name <input id="p-name" autocomplete="off" placeholder="this computer"></label>
+    <fieldset>
+      <legend>Where to keep this device's key</legend>
+      <label class="inline"><input type="radio" name="mode" value="keyring" checked> OS keyring</label>
+      <label class="inline"><input type="radio" name="mode" value="passphrase"> Passphrase-protected file</label>
+    </fieldset>
+    <label id="p-pass-row" hidden>Passphrase <input id="p-pass" type="password" autocomplete="new-password"></label>
+    <div class="row">
+      <button type="submit" id="p-go">Pair</button>
+      <button type="button" id="p-cancel" hidden>Cancel</button>
+    </div>
+  </form>
+</main>
+
+<div id="app" hidden>
+  <header>
+    <select id="server" aria-label="Server"></select>
+    <nav id="tabs" aria-label="Sessions"></nav>
+    <button id="new-tab" title="New session" aria-label="New session">+</button>
+    <span class="spacer"></span>
+    <button id="files-btn">Files</button>
+    <button id="add-server">Add server</button>
+    <button id="forget">Forget</button>
+  </header>
+  <div id="terms"></div>
+</div>
+
+<section id="files" hidden aria-label="Files">
+  <div class="row">
+    <strong id="f-path"></strong>
+    <span class="spacer"></span>
+    <span id="f-status"></span>
+    <button id="f-up">Upload here</button>
+    <button id="f-close">Close</button>
+  </div>
+  <ul id="f-list"></ul>
+</section>
+
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="m-title" hidden>
+  <div class="box">
+    <h2 id="m-title"></h2>
+    <pre id="m-body"></pre>
+    <input id="m-input" autocomplete="off" spellcheck="false" hidden>
+    <div class="row" id="m-buttons"></div>
+  </div>
+</div>
+
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
