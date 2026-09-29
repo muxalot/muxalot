@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/banner.svg" alt="Muxalot" width="600"></p>
 
-Open source under the [MIT License](LICENSE). Website: <https://muxalot.com>. Source and issues: <https://github.com/muxalot/muxalot>
+Open source under the [MIT License](LICENSE). Website: <https://muxalot.com>. Source and issues: <https://github.com/muxalot/muxalot>. Play Store testers: [join the closed test](https://play.google.com/apps/testing/dev.muxalot.pro) / [Play listing](https://play.google.com/store/apps/details?id=dev.muxalot.pro)
 
 Remote terminal for Android, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session.
 
@@ -92,7 +92,7 @@ REST (all signed): `GET /sessions`, `DELETE /sessions/{name}`, `GET /ls?path=`, 
 
 ## Support the project
 
-Muxalot is free and stays free. If it saves you time, you can support development with GitHub Sponsors or with the supporter edition ("Muxalot Pro") on Google Play once it's listed. The pro build comes from the same source in this repo (`pro` flavor: `gradle :app:assembleProDebug`) and adds shortcut export/import, terminal color themes, and multi-file upload with progress bars. Everything else is identical to the free build.
+Muxalot is free and stays free. If it saves you time, you can support development with GitHub Sponsors or with the supporter edition ("Muxalot Pro") on Google Play, currently in closed testing. Testers: [join the test](https://play.google.com/apps/testing/dev.muxalot.pro), then install from the [Play listing](https://play.google.com/store/apps/details?id=dev.muxalot.pro). The pro build comes from the same source in this repo (`pro` flavor: `gradle :app:assembleProDebug`) and adds shortcut export/import, terminal color themes, and multi-file upload with progress bars. Everything else is identical to the free build.
 
 <a href="https://www.buymeacoffee.com/luckyedward"><img src="https://img.shields.io/badge/%F0%9F%8D%BA-Buy%20me%20a%20drink-BD5FFF?style=for-the-badge" alt="Buy me a drink"></a>
 
