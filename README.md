@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/banner.svg" alt="Muxalot" width="600"></p>
 
-Open source under the [MIT License](LICENSE). Source and issues: <https://github.com/muxalot/muxalot>
+Open source under the [MIT License](LICENSE). Website: <https://muxalot.com>. Source and issues: <https://github.com/muxalot/muxalot>
 
 Remote terminal for Android, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session.
 
