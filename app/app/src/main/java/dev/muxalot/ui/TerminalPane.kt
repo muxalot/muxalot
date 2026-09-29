@@ -1,6 +1,7 @@
 package dev.muxalot.ui
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -10,7 +11,9 @@ import android.util.Base64
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.compose.runtime.Composable
@@ -40,10 +43,15 @@ class TerminalPaneView(
     private var ready = false
     private var font = 14
     private var disposed = false
+    private var confirming = false
 
     init {
         web.settings.javaScriptEnabled = true
-        web.settings.allowFileAccess = true // only bundled assets are loaded
+        web.settings.allowFileAccess = false // android_asset URLs don't need it
+        web.webViewClient = object : WebViewClient() {
+            // the terminal page never navigates; block anything that tries
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
+        }
         web.isFocusable = false
         web.isFocusableInTouchMode = false
         web.overScrollMode = OVER_SCROLL_NEVER
@@ -96,6 +104,20 @@ class TerminalPaneView(
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("terminal", text))
         Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    }
+
+    /** OSC 52 arrives from terminal output, so a program or file could overwrite the clipboard: ask first. */
+    private fun confirmClipboard(text: String) {
+        if (disposed || confirming || text.isEmpty()) return
+        confirming = true
+        val preview = if (text.length > 300) text.take(300) + "…" else text
+        AlertDialog.Builder(context)
+            .setTitle("Copy to clipboard?")
+            .setMessage("The terminal wants to copy ${text.length} characters:\n\n$preview")
+            .setPositiveButton("Copy") { _, _ -> copyToClipboard(text) }
+            .setNegativeButton("Deny", null)
+            .setOnDismissListener { confirming = false }
+            .show()
     }
 
     fun showKeyboard() {
@@ -156,7 +178,7 @@ class TerminalPaneView(
 
         @JavascriptInterface
         fun onClipboard(text: String) {
-            main.post { copyToClipboard(text) }
+            main.post { confirmClipboard(text) }
         }
 
         @JavascriptInterface

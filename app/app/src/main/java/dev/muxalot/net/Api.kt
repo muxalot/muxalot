@@ -53,6 +53,11 @@ data class FileEntry(val name: String, val dir: Boolean, val size: Long = 0, val
 @Serializable
 data class LsResult(val path: String, val entries: List<FileEntry>)
 
+/** Cap for text responses; a hostile server could otherwise stream us out of memory. Longer bodies are cut, so JSON parsing fails. */
+private const val MAX_TEXT = 1 shl 20
+
+private fun Response.text(): String = peekBody(MAX_TEXT.toLong()).string()
+
 class ApiException(val code: Int, message: String) : IOException(message)
 
 class Api(private val server: Server) {
@@ -61,6 +66,8 @@ class Api(private val server: Server) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
         val client: OkHttpClient = OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
@@ -76,7 +83,7 @@ class Api(private val server: Server) {
             val body = JSONObject().put("code", code).put("name", name).put("pubkey", pubKey)
                 .toString().toRequestBody("application/json".toMediaType())
             client.newCall(Request.Builder().url(url).post(body).build()).execute().use { r ->
-                val text = r.body?.string().orEmpty()
+                val text = r.text()
                 if (!r.isSuccessful) throw ApiException(r.code, text.trim().ifEmpty { "HTTP ${r.code}" })
                 return JSONObject(text).getString("device_id")
             }
@@ -94,13 +101,13 @@ class Api(private val server: Server) {
             .header("Authorization", Auth.header(server, method, url)).build()
 
     private fun check(r: Response) {
-        if (!r.isSuccessful) throw ApiException(r.code, r.body?.string()?.trim().orEmpty().ifEmpty { "HTTP ${r.code}" })
+        if (!r.isSuccessful) throw ApiException(r.code, r.text().trim().ifEmpty { "HTTP ${r.code}" })
     }
 
     fun sessions(): List<SessionInfo> =
         client.newCall(request("GET", url("sessions"))).execute().use { r ->
             check(r)
-            json.decodeFromString(r.body!!.string())
+            json.decodeFromString(r.text())
         }
 
     fun kill(name: String) {
@@ -110,7 +117,7 @@ class Api(private val server: Server) {
     fun ls(path: String): LsResult =
         client.newCall(request("GET", url("ls", query = mapOf("path" to path)))).execute().use { r ->
             check(r)
-            json.decodeFromString(r.body!!.string())
+            json.decodeFromString(r.text())
         }
 
     /** [onProgress] gets (bytes so far, total or -1 if unknown). */

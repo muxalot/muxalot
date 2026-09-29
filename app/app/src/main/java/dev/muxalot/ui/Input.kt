@@ -109,7 +109,8 @@ class InputEncoder(private val conn: TerminalConnection) {
 
     /** Paste text, using bracketed paste when the app inside the terminal enabled it. */
     fun paste(text: String) {
-        val t = text.replace("\r\n", "\n").replace('\n', '\r')
+        // ESC is dropped so pasted text can't close the bracket early (ESC[201~) and run the rest as typed input
+        val t = text.replace("\u001b", "").replace("\r\n", "\n").replace('\n', '\r')
         if (bracketed) raw("\u001b[200~$t\u001b[201~") else raw(t)
     }
 
