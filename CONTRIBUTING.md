@@ -18,7 +18,7 @@ Tmux tests use a private `TMUX_TMPDIR` and are skipped if `tmux` isn't installed
 
 ## App (Android)
 
-Open `app/` in Android Studio, or build from the command line with Gradle 8.10+ (`gradle :app:assembleDebug`). minSdk 26. There is no Gradle wrapper in the repo.
+Open `app/` in Android Studio, or build from the command line with Gradle 8.10+ (`gradle :app:assembleFreeDebug`; the `pro` flavor is the Play supporter build from the same source). minSdk 26. There is no Gradle wrapper in the repo.
 
 ## Pull requests
 

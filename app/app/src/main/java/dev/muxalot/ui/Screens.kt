@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import dev.muxalot.Edition
 import dev.muxalot.data.DeviceKey
 import dev.muxalot.data.Server
 import dev.muxalot.data.ServerStore
@@ -59,7 +60,7 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
     var servers by remember { mutableStateOf(store.load()) }
     var deleting by remember { mutableStateOf<Server?>(null) }
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Servers") }, actions = { TextButton(onClick = onAdd) { Text("+ Add") } }) },
+        topBar = { TopAppBar(title = { Text(if (Edition.isPro) "Servers · Supporter" else "Servers") }, actions = { TextButton(onClick = onAdd) { Text("+ Add") } }) },
     ) { pad ->
         if (servers.isEmpty()) {
             Column(Modifier.padding(pad).padding(24.dp).fillMaxSize(), verticalArrangement = Arrangement.Center) {

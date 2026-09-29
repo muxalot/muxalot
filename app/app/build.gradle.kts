@@ -17,6 +17,17 @@ android {
         versionName = "0.1.0"
     }
 
+    // free: dev.muxalot (GitHub). pro: dev.muxalot.pro, the supporter build for Google Play; same source, gated by Edition.isPro
+    flavorDimensions += "edition"
+    productFlavors {
+        create("free") { dimension = "edition" }
+        create("pro") {
+            dimension = "edition"
+            applicationIdSuffix = ".pro"
+            versionNameSuffix = "-pro"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
