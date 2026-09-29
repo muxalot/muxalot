@@ -20,7 +20,7 @@ NEXT := $(shell echo $(LAST) | awk -F. -v b=$(BUMP) '{sub(/^v/,"",$$1); if (b=="
 
 GR = $(GRADLE) -q $(GRADLE_FLAGS) -p app -PversionName=$(VERSION) -PversionCode=$(CODE)
 
-.PHONY: help version test agent apk aab release release-agent release-apk check-gradle check-clean check-tag
+.PHONY: help version test agent desktop desktop-assets desktop-test apk aab release release-agent release-apk check-gradle check-clean check-tag
 .DEFAULT_GOAL := help
 
 help: ## this list
@@ -38,6 +38,22 @@ agent: ## cross-compile the agent (linux amd64+arm64) into dist/
 	  CGO_ENABLED=0 GOOS=linux GOARCH=$$a go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" \
 	    -o ../$(DIST)/muxalot-agent-linux-$$a . || exit 1; done
 	cd $(DIST) && sha256sum muxalot-agent-linux-* > SHA256SUMS
+
+DESKTOP_VENDOR := xterm.js xterm.css addon-fit.js JetBrainsMonoNerdFontMono-Regular.woff2 LICENSE-xterm.txt LICENSE-nerdfonts.txt
+# gtk3 = WebKitGTK 4.1 (libgtk-3-dev libwebkit2gtk-4.1-dev); production turns DevTools off
+DESKTOP_TAGS ?= gtk3
+
+desktop-assets: ## copy xterm.js and the font from the Android assets into desktop/frontend/vendor/
+	mkdir -p desktop/frontend/vendor
+	cd app/app/src/main/assets && cp $(DESKTOP_VENDOR) ../../../../../desktop/frontend/vendor/
+
+desktop-test: desktop-assets ## desktop go vet + go test (needs GTK3/WebKitGTK dev packages; e2e needs tmux)
+	cd desktop && go vet -tags "$(DESKTOP_TAGS)" ./... && go test -tags "$(DESKTOP_TAGS)" ./...
+
+desktop: desktop-assets ## build the desktop client for this OS into dist/
+	mkdir -p $(DIST)
+	cd desktop && CGO_ENABLED=1 go build -tags "production $(DESKTOP_TAGS)" -trimpath -ldflags "-s -w -X main.version=$(VERSION)" \
+	  -o ../$(DIST)/muxalot-desktop-$$(go env GOOS)-$$(go env GOARCH) .
 
 check-gradle:
 	@test -n "$(GRADLE)" || { echo "Gradle 8.10+ not found; run make with GRADLE=/path/to/gradle"; exit 1; }
