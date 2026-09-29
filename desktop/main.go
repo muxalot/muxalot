@@ -75,6 +75,9 @@ func main() {
 		log.Fatal("frontend/vendor is missing: build with `make desktop`")
 	}
 
+	// Leave Linux.ApplicationID and Linux.ProgramName unset: GTK takes the window's Wayland app_id
+	// and X11 WM_CLASS from the executable name, and the packaged launcher
+	// (packaging/muxalot-desktop.desktop) matches on "muxalot-desktop". Setting either breaks that.
 	app := application.New(application.Options{
 		Name:     "muxalot",
 		Services: []application.Service{application.NewService(svc)},

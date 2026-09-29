@@ -29,11 +29,13 @@ jobs:
         with:
           go-version-file: desktop/go.mod
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y tmux libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y tmux libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev fakeroot desktop-file-utils
       - name: Test
         run: make desktop-test
       - name: Build
         run: make desktop
+      - name: Package (dry run; the release builds on Ubuntu 22.04)
+        run: desktop-file-validate desktop/packaging/muxalot-desktop.desktop && make deb
       - name: Vulnerability scan
         working-directory: desktop
         run: go run golang.org/x/vuln/cmd/govulncheck@latest -tags gtk3 ./...
