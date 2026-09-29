@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -28,6 +29,12 @@ import (
 var sessionRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
 
 type ctxKey struct{}
+
+// revokeInterval is how often an open terminal re-checks that its device is still paired.
+var revokeInterval = 5 * time.Second
+
+// pairBodyTimeout bounds how long an unauthenticated client may take to send the /pair body.
+var pairBodyTimeout = 10 * time.Second
 
 type Server struct {
 	st        *Store
@@ -85,6 +92,7 @@ type limiter struct {
 	max    int
 	window time.Duration
 	m      map[string]*failRec
+	swept  time.Time
 }
 type failRec struct {
 	n     int
@@ -95,7 +103,16 @@ func newLimiter(max int, window time.Duration) *limiter {
 	return &limiter{max: max, window: window, m: map[string]*failRec{}}
 }
 
+// limitKey buckets IPv6 clients by /64, since one subscriber usually controls the whole prefix.
+func limitKey(ip string) string {
+	if a := net.ParseIP(ip); a != nil && a.To4() == nil {
+		return a.Mask(net.CIDRMask(64, 128)).String()
+	}
+	return ip
+}
+
 func (l *limiter) blocked(ip string) bool {
+	ip = limitKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	r := l.m[ip]
@@ -110,11 +127,16 @@ func (l *limiter) blocked(ip string) bool {
 }
 
 func (l *limiter) fail(ip string) {
+	ip = limitKey(ip)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	for k, v := range l.m {
-		if time.Since(v.start) > l.window {
-			delete(l.m, k)
+	// Sweep at most every window/10, so many distinct sources can't make each failure O(n).
+	if time.Since(l.swept) > l.window/10 {
+		l.swept = time.Now()
+		for k, v := range l.m {
+			if time.Since(v.start) > l.window {
+				delete(l.m, k)
+			}
 		}
 	}
 	r := l.m[ip]
@@ -213,11 +235,12 @@ func (s *Server) auth(next func(http.ResponseWriter, *http.Request)) http.Handle
 		// No IP rate limit here: forging a signature is infeasible, and
 		// counting failures would let anyone sharing an IP (NAT) or a
 		// skewed clock lock out the real device. Only /pair is limited.
-		if s.verify(r) == nil {
+		dev := s.verify(r)
+		if dev == nil {
 			http.NotFound(w, r) // reveal nothing
 			return
 		}
-		next(w, r)
+		next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, dev.ID)))
 	}
 }
 
@@ -233,6 +256,7 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "too many attempts", http.StatusTooManyRequests)
 		return
 	}
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(pairBodyTimeout))
 	var req struct {
 		Code   string `json:"code"`
 		Name   string `json:"name"`
@@ -364,6 +388,24 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				writeCtrl(ctrlMsg{T: "exit"})
 				return
+			}
+		}
+	}()
+
+	// A live terminal outlives its signature check, so drop it once the device is revoked.
+	deviceID, _ := r.Context().Value(ctxKey{}).(string)
+	go func() {
+		t := time.NewTicker(revokeInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-t.C:
+				if dev, _ := s.st.Lookup(deviceID); dev == nil {
+					_ = conn.Close()
+					return
+				}
 			}
 		}
 	}()
@@ -605,7 +647,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	overwrite := r.URL.Query().Get("overwrite") == "1"
-	mode := os.FileMode(0o644)
+	mode := os.FileMode(0o600)
 	if fi, err := os.Lstat(p); err == nil {
 		if !fi.Mode().IsRegular() {
 			http.Error(w, "target is not a regular file", http.StatusBadRequest)
