@@ -64,7 +64,7 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
         if (servers.isEmpty()) {
             Column(Modifier.padding(pad).padding(24.dp).fillMaxSize(), verticalArrangement = Arrangement.Center) {
                 Text("No servers yet.", style = MaterialTheme.typography.titleMedium)
-                Text("On the server run:  ttyagent pair --url https://your.host\nthen scan the QR code.", modifier = Modifier.padding(top = 8.dp))
+                Text("On the server run:  muxalot-agent pair --url https://your.host\nthen scan the QR code.", modifier = Modifier.padding(top = 8.dp))
                 Button(onClick = onAdd, modifier = Modifier.padding(top = 16.dp)) { Text("Pair a server") }
             }
         } else {
@@ -89,7 +89,7 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("Remove ${s.name}?") },
-            text = { Text("Deletes this phone's key for the server. Also run  ttyagent revoke ${s.deviceId}  on the server.") },
+            text = { Text("Deletes this phone's key for the server. Also run  muxalot-agent revoke ${s.deviceId}  on the server.") },
             confirmButton = {
                 TextButton(onClick = { store.remove(s.id); servers = store.load(); deleting = null }) { Text("Remove") }
             },
@@ -137,7 +137,7 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
             } catch (e: Exception) {
                 DeviceKey.delete(id)
                 error = when {
-                    e is ApiException && e.code == 401 -> "Invalid or expired code. Run  ttyagent pair  again."
+                    e is ApiException && e.code == 401 -> "Invalid or expired code. Run  muxalot-agent pair  again."
                     e is ApiException && e.code == 429 -> "Too many attempts. Wait 15 minutes."
                     else -> e.message ?: e.javaClass.simpleName
                 }
@@ -150,7 +150,7 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
     Scaffold(topBar = { TopAppBar(title = { Text("Pair server") }) }) { pad ->
         Column(Modifier.padding(pad).padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = {
-                scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the ttyagent pair QR").setBeepEnabled(false))
+                scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the muxalot-agent pair QR").setBeepEnabled(false))
             }) { Text("Scan QR code") }
             OutlinedTextField(url, { url = it }, label = { Text("Server URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(code, { code = it }, label = { Text("Pairing code") }, singleLine = true, modifier = Modifier.fillMaxWidth())

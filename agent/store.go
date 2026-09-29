@@ -54,7 +54,7 @@ type Store struct {
 }
 
 // lockState takes the exclusive file lock for the duration of a state
-// mutation (load-modify-save), coordinating with other ttyagent processes.
+// mutation (load-modify-save), coordinating with other muxalot-agent processes.
 func (s *Store) lockState() (func(), error) {
 	f, err := os.OpenFile(s.path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {

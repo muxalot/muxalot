@@ -1,12 +1,12 @@
 [Unit]
-Description=ttyagent remote terminal agent
+Description=muxalot-agent remote terminal agent
 After=network.target
 
 [Service]
 # Unprivileged user only; the agent refuses to run as root.
-User=ttyagent
-Group=ttyagent
-ExecStart=/usr/local/bin/ttyagent serve --listen 127.0.0.1:8787 --files-root /home/ttyagent
+User=muxalot-agent
+Group=muxalot-agent
+ExecStart=/usr/local/bin/muxalot-agent serve --listen 127.0.0.1:8787 --files-root /home/muxalot-agent
 Restart=on-failure
 # Deliberately NOT sandboxed with ProtectSystem/NoNewPrivileges: this is an interactive
 # shell, so tmux needs /tmp and users may need sudo. Limit access with the Unix user instead.

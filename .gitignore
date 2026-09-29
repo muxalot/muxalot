@@ -3,7 +3,7 @@
 build/
 local.properties
 *.apk
-/agent/ttyagent
+/agent/muxalot-agent
 .env
 state.json
 CLAUDE.md

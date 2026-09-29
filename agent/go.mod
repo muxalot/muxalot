@@ -1,4 +1,4 @@
-module ttyagent
+module muxalot-agent
 
 go 1.24.7
 
