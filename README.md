@@ -39,6 +39,14 @@ sudo cp ../deploy/muxalot-agent.service /etc/systemd/system/ && sudo systemctl e
 sudo -u muxalot-agent muxalot-agent pair --url https://tty.example.com     # QR + one-time code
 ```
 
+Caddy reads these environment variables (see `deploy/Caddyfile`):
+
+| Variable | Meaning |
+|---|---|
+| `MUXALOT_DOMAIN` | Public hostname Caddy serves, e.g. `tty.example.com` |
+| `MUXALOT_AGENT` | Agent address to proxy to, e.g. `127.0.0.1:8787` (must match the agent's `--listen`) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token for DNS-01 TLS. Only needed with the bundled `(cloudflare)` snippet; use your own `tls` block otherwise |
+
 Recommended `~muxalot-agent/.tmux.conf`: `set -g mouse on` (swipe-to-scroll in the app maps to tmux wheel events). The agent sets `set-clipboard on` itself.
 
 Files: uploads/downloads are confined to `--files-root` (default: the agent user's home), symlink-safe, size-capped by `--max-upload-mb`.
