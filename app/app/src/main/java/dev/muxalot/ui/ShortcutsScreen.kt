@@ -38,6 +38,14 @@ import dev.muxalot.data.Shortcut
 import dev.muxalot.data.ShortcutStore
 import dev.muxalot.data.ThemeStore
 import dev.muxalot.data.Themes
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import dev.muxalot.ui.kit.MuxCard
+import dev.muxalot.ui.kit.MuxChip
+import dev.muxalot.ui.kit.MuxIcons
+import dev.muxalot.ui.kit.RoundIconButton
+import dev.muxalot.ui.kit.ScreenHeader
 
 private const val MAX_LABEL = 4 // fits the round fan button
 
@@ -55,7 +63,6 @@ fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val themes = remember { ThemeStore(ctx) }
     var theme by remember { mutableStateOf(themes.name()) }
-    var pickingTheme by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) note = runCatching {
@@ -73,63 +80,45 @@ fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
         }.getOrElse { "Import failed: ${it.message}" }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Shortcuts") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("‹ Back") } },
-                actions = { TextButton(onClick = { editing = -1 }) { Text("+ Add") } },
-            )
-        },
-    ) { pad ->
-        LazyColumn(Modifier.padding(pad).fillMaxSize()) {
-            if (Edition.isPro) item {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { export.launch("muxalot-shortcuts.json") }) { Text("Export") }
-                        OutlinedButton(onClick = { import.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import (replaces list)") }
-                    }
-                    OutlinedButton(onClick = { pickingTheme = true }) { Text("Theme: $theme") }
-                    note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                }
-                HorizontalDivider()
-            }
-            itemsIndexed(list) { i, s ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { editing = i }.padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(s.text, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            "${s.label} · " + if (s.enter) "types and presses Enter" else "types only",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    TextButton(onClick = { update(list.filterIndexed { j, _ -> j != i }) }) { Text("Delete") }
-                }
-                HorizontalDivider()
-            }
-        }
-    }
-
-    if (pickingTheme) {
-        AlertDialog(
-            onDismissRequest = { pickingTheme = false },
-            title = { Text("Terminal theme") },
-            text = {
-                Column {
-                    Themes.presets.keys.forEach { n ->
-                        TextButton(onClick = { themes.setName(n); theme = n; pickingTheme = false }) {
-                            Text(if (n == theme) "✓ $n" else n)
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            ScreenHeader("Shortcuts", onBack = onBack, actions = { RoundIconButton(MuxIcons.Plus, "Add shortcut") { editing = -1 } })
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (Edition.isPro) item {
+                    MuxCard {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Backup", style = MaterialTheme.typography.titleMedium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { export.launch("muxalot-shortcuts.json") }) { Text("Export") }
+                                OutlinedButton(onClick = { import.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import (replaces list)") }
+                            }
+                            note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                            Text("Terminal theme", style = MaterialTheme.typography.titleMedium)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(Themes.presets.keys.toList()) { n ->
+                                    MuxChip(n, selected = n == theme, onClick = { themes.setName(n); theme = n })
+                                }
+                            }
                         }
                     }
                 }
-            },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { pickingTheme = false }) { Text("Cancel") } },
-        )
+                itemsIndexed(list) { i, s ->
+                    MuxCard(onClick = { editing = i }) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(s.text, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    "${s.label} · " + if (s.enter) "types and presses Enter" else "types only",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = { update(list.filterIndexed { j, _ -> j != i }) }) { Text("Delete") }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     editing?.let { idx ->
