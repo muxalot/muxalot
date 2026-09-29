@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 520" role="img" aria-label="Muxalot file browser"><rect x="2" y="2" width="256" height="516" rx="34" fill="#0b0a0f" stroke="#3a3547" stroke-width="3"/><rect x="12" y="12" width="236" height="496" rx="26" fill="#121016"/><g font-family="system-ui,sans-serif" fill="#ece9f5"><text x="28" y="40" font-size="10" fill="#a29bb5">10:26</text>
+<text x="28" y="80" font-size="17" font-weight="700">Files</text>
+<text x="28" y="98" font-size="10" fill="#a29bb5">/home/you/app</text>
+<g font-size="12">
+<rect x="24" y="112" width="212" height="44" rx="12" fill="#23202c"/><path d="M38 128h8l3 4h11v14H38z" fill="#a78bfa"/><text x="66" y="139">src</text>
+<rect x="24" y="164" width="212" height="44" rx="12" fill="#23202c"/><path d="M38 180h8l3 4h11v14H38z" fill="#a78bfa"/><text x="66" y="191">docs</text>
+<rect x="24" y="216" width="212" height="44" rx="12" fill="#23202c"/><rect x="40" y="230" width="14" height="18" rx="2" fill="none" stroke="#a29bb5" stroke-width="1.5"/><text x="66" y="243">README.md</text><text x="220" y="243" font-size="9" text-anchor="end" fill="#a29bb5">4 KB</text>
+<rect x="24" y="268" width="212" height="44" rx="12" fill="#23202c"/><rect x="40" y="282" width="14" height="18" rx="2" fill="none" stroke="#a29bb5" stroke-width="1.5"/><text x="66" y="295">build.log</text><text x="220" y="295" font-size="9" text-anchor="end" fill="#a29bb5">212 KB</text>
+</g>
+<rect x="150" y="440" width="86" height="40" rx="20" fill="#a78bfa"/><text x="193" y="465" font-size="12" text-anchor="middle" fill="#1e1b4b" font-weight="700">Upload</text>
+</g></svg>
