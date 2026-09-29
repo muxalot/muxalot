@@ -41,8 +41,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import androidx.compose.foundation.Image
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import dev.muxalot.Edition
+import dev.muxalot.R
 import dev.muxalot.data.DeviceKey
+import dev.muxalot.ui.kit.MuxButton
+import dev.muxalot.ui.kit.MuxCard
+import dev.muxalot.ui.kit.MuxIcons
+import dev.muxalot.ui.kit.MuxTonalButton
+import dev.muxalot.ui.kit.RoundIconButton
+import dev.muxalot.ui.kit.ScreenHeader
+import dev.muxalot.ui.theme.Mux
 import dev.muxalot.data.Server
 import dev.muxalot.data.ServerStore
 import dev.muxalot.net.Api
@@ -60,29 +75,43 @@ import java.util.UUID
 fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> Unit) {
     var servers by remember { mutableStateOf(store.load()) }
     var deleting by remember { mutableStateOf<Server?>(null) }
-    Scaffold(
-        topBar = { TopAppBar(title = { Text(if (Edition.isPro) "Servers · Supporter" else "Servers") }, actions = { TextButton(onClick = onAdd) { Text("+ Add") } }) },
-    ) { pad ->
-        if (servers.isEmpty()) {
-            Column(Modifier.padding(pad).padding(24.dp).fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                Text("No servers yet.", style = MaterialTheme.typography.titleMedium)
-                Text("On the server run:  muxalot-agent pair --url https://your.host\nthen scan the QR code.", modifier = Modifier.padding(top = 8.dp))
-                Button(onClick = onAdd, modifier = Modifier.padding(top = 16.dp)) { Text("Pair a server") }
-            }
-        } else {
-            LazyColumn(Modifier.padding(pad).fillMaxSize()) {
-                items(servers, key = { it.id }) { s ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onOpen(s) }.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(s.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(s.url, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            ScreenHeader(
+                title = if (Edition.isPro) "Servers · Supporter" else "Servers",
+                leading = { Image(painterResource(R.drawable.logo_mark), null, Modifier.size(32.dp)) },
+                actions = { RoundIconButton(MuxIcons.Plus, "Add server", onAdd) },
+            )
+            if (servers.isEmpty()) {
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Image(painterResource(R.drawable.logo_mark), null, Modifier.size(140.dp))
+                    Text("No servers yet", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp))
+                    Text(
+                        "On the server run:\nmuxalot-agent pair --url https://your.host\nthen scan the QR code.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                    MuxButton("Pair a server", onAdd, Modifier.padding(top = 12.dp))
+                }
+            } else {
+                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(servers, key = { it.id }) { s ->
+                        MuxCard(onClick = { onOpen(s) }) {
+                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(MuxIcons.Server, null, tint = Mux.colors.mintText)
+                                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                    Text(s.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(s.url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                TextButton(onClick = { deleting = s }) { Text("Remove") }
+                            }
                         }
-                        TextButton(onClick = { deleting = s }) { Text("Remove") }
                     }
-                    HorizontalDivider()
                 }
             }
         }
@@ -149,25 +178,26 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
         }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Pair server") }) }) { pad ->
-        Column(Modifier.padding(pad).padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = {
-                scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the muxalot-agent pair QR").setBeepEnabled(false))
-            }) { Text("Scan QR code") }
-            OutlinedTextField(url, { url = it }, label = { Text("Server URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(code, { code = it }, label = { Text("Pairing code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(name, { name = it }, label = { Text("This device's name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(enabled = !busy && url.isNotBlank() && code.isNotBlank(), onClick = { pair() }) { Text("Pair") }
-                TextButton(onClick = onCancel) { Text("Cancel") }
-                if (busy) CircularProgressIndicator(Modifier.padding(start = 8.dp))
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            ScreenHeader("Pair server", onBack = onCancel)
+            Column(Modifier.padding(16.dp).fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MuxTonalButton("Scan QR code", {
+                    scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the muxalot-agent pair QR").setBeepEnabled(false))
+                })
+                OutlinedTextField(url, { url = it }, label = { Text("Server URL") }, singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(code, { code = it }, label = { Text("Pairing code") }, singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(name, { name = it }, label = { Text("This device's name") }, singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                MuxButton("Pair", { pair() }, enabled = !busy && url.isNotBlank() && code.isNotBlank())
+                if (busy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                Text(
+                    "A key pair is generated on this phone. Only the public key is sent to the server; " +
+                        "the private key never leaves the Android Keystore.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text(
-                "A key pair is generated on this phone. Only the public key is sent to the server; " +
-                    "the private key never leaves the Android Keystore.",
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
@@ -307,40 +337,36 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Files") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("‹ Back") } },
-                actions = {
-                    TextButton(onClick = { if (Edition.isPro) uploadMany.launch(arrayOf("*/*")) else upload.launch(arrayOf("*/*")) }) { Text("Upload") }
-                },
-            )
-        },
-    ) { pad ->
+    Scaffold { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            Text(shown, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            ScreenHeader(
+                "Files", onBack = onBack,
+                actions = { RoundIconButton(MuxIcons.Plus, "Upload") { if (Edition.isPro) uploadMany.launch(arrayOf("*/*")) else upload.launch(arrayOf("*/*")) } },
+            )
+            Text(shown, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
             val p = progress
-            if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-            else if (busy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp))
+            if (p != null) LinearProgressIndicator(progress = { p }, color = Mux.colors.mint, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+            else if (busy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp), color = Mux.colors.mint)
             status?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall) }
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
-                    Text(
-                        "..",
-                        Modifier.fillMaxWidth().clickable { path = shown.substringBeforeLast('/', "/").ifEmpty { "/" } }.padding(16.dp),
-                    )
+                    MuxCard(onClick = { path = shown.substringBeforeLast('/', "/").ifEmpty { "/" } }) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(MuxIcons.Folder, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("..", Modifier.padding(start = 12.dp))
+                        }
+                    }
                 }
-                items(entries, key = { it.name }) { e ->
-                    Row(
-                        Modifier.fillMaxWidth().clickable {
-                            if (e.dir) path = join(shown, e.name)
-                            else { pendingDownload = join(shown, e.name); download.launch(e.name) }
-                        }.padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(if (e.dir) "${e.name}/" else e.name, Modifier.weight(1f))
-                        if (!e.dir) Text(humanSize(e.size), style = MaterialTheme.typography.bodySmall)
+                items(entries.sortedBy { !it.dir }, key = { it.name }) { e -> // folders first
+                    MuxCard(onClick = {
+                        if (e.dir) path = join(shown, e.name)
+                        else { pendingDownload = join(shown, e.name); download.launch(e.name) }
+                    }) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (e.dir) MuxIcons.Folder else MuxIcons.File, null, tint = if (e.dir) Mux.colors.mintText else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(e.name, Modifier.weight(1f).padding(horizontal = 12.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (!e.dir) Text(humanSize(e.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }

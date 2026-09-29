@@ -5,9 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +17,7 @@ import dev.muxalot.ui.PairScreen
 import dev.muxalot.ui.ServerListScreen
 import dev.muxalot.ui.ShortcutsScreen
 import dev.muxalot.ui.TerminalScreen
+import dev.muxalot.ui.theme.MuxalotTheme
 
 private sealed interface Screen {
     data object List : Screen
@@ -38,7 +37,7 @@ class MainActivity : ComponentActivity() {
         val shortcuts = ShortcutStore(this)
         handlePairIntent(intent)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            MuxalotTheme {
                 Surface {
                     when (val s = screen) {
                         Screen.List -> ServerListScreen(

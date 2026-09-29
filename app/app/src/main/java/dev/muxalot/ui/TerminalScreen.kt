@@ -9,8 +9,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import dev.muxalot.ui.kit.MuxChip
+import dev.muxalot.ui.kit.MuxIcons
+import dev.muxalot.ui.kit.RoundIconButton
+import dev.muxalot.ui.kit.ScreenHeader
+import dev.muxalot.ui.kit.StatusDot
+import dev.muxalot.ui.kit.stateColor
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,15 +99,17 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
     }
     BackHandler(onBack = onBack)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(server.name, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = { TextButton(onClick = onBack) { Text("‹ Servers") } },
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).consumeWindowInsets(pad).imePadding().fillMaxSize()) {
+            ScreenHeader(
+                title = server.name,
+                onBack = onBack,
+                leading = { ctrl.selected?.let { StatusDot(stateColor(ctrl.states[it])); Spacer(Modifier.width(8.dp)) } },
                 actions = {
-                    TextButton(onClick = { newTab = true }) { Text("+ Tab") }
-                    TextButton(onClick = { menu = true }) { Text("⋮") }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    RoundIconButton(MuxIcons.Plus, "New tab") { newTab = true }
+                    Box {
+                        RoundIconButton(MuxIcons.More, "Menu") { menu = true }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         val sel = ctrl.selected
                         DropdownMenuItem(text = { Text("Files") }, onClick = { menu = false; onFiles() })
                         DropdownMenuItem(text = { Text("Shortcuts") }, onClick = { menu = false; onShortcuts() })
@@ -118,41 +134,26 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                         DropdownMenuItem(text = { Text("Reconnect") }, onClick = { menu = false; ctrl.kick() })
                         DropdownMenuItem(text = { Text("Refresh sessions") }, onClick = { menu = false; ctrl.load() })
                         DropdownMenuItem(text = { Text("Close tab…") }, onClick = { menu = false; closing = sel })
+                        }
                     }
                 },
             )
-        },
-    ) { pad ->
-        Column(
-            Modifier
-                .padding(pad)
-                .consumeWindowInsets(pad)
-                .imePadding()
-                .fillMaxSize()
-        ) {
             ctrl.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(8.dp))
             }
             if (ctrl.tabs.isNotEmpty()) {
                 val idx = ctrl.tabs.indexOf(ctrl.selected).coerceAtLeast(0)
-                ScrollableTabRow(selectedTabIndex = idx, edgePadding = 0.dp) {
-                    ctrl.tabs.forEach { name ->
-                        Tab(
-                            selected = name == ctrl.selected,
-                            onClick = { ctrl.selected = name },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    val color = when (ctrl.states[name]) {
-                                        ConnState.CONNECTED -> Color(0xFF4CAF50)
-                                        ConnState.EXITED -> Color.Gray
-                                        ConnState.RECONNECTING -> Color(0xFFFFB300)
-                                        else -> Color(0xFF90A4AE)
-                                    }
-                                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-                                    Text(name, modifier = Modifier.padding(start = 6.dp))
-                                }
-                            },
-                        )
+                val tabState = rememberLazyListState()
+                LaunchedEffect(idx) { tabState.animateScrollToItem(idx) }
+                LazyRow(
+                    state = tabState,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(ctrl.tabs, key = { it }) { name ->
+                        val sel = name == ctrl.selected
+                        // the selected tab's state is the dot in the header
+                        MuxChip(name, sel, { ctrl.selected = name }, dot = if (sel) null else stateColor(ctrl.states[name]))
                     }
                 }
             }
@@ -169,7 +170,7 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                     }
                 }
                 if (ctrl.tabs.isEmpty()) {
-                    Text("No sessions. Tap “+ Tab”.", modifier = Modifier.align(Alignment.Center))
+                    Text("No sessions. Tap +.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
                 }
                 ctrl.selected?.let { KeyFan(ctrl.enc(it), shortcuts, Modifier.fillMaxSize()) }
             }
@@ -344,7 +345,7 @@ private fun FanRow(item: FanKey, modifier: Modifier, onPress: () -> Unit) {
             modifier = Modifier
                 .padding(start = 6.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xCC151A21))
+                .background(Color(0xE6151320))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
@@ -356,7 +357,7 @@ private fun FanButton(label: String, active: Boolean, modifier: Modifier, size: 
         modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(if (active) MaterialTheme.colorScheme.primary else Color(0xFF2A313B)),
+            .background(if (active) MaterialTheme.colorScheme.primary else Color(0xFF2A2536)),
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = if (active) MaterialTheme.colorScheme.onPrimary else Color.White, fontSize = if (size > BTN) 20.sp else 12.sp)

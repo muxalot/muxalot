@@ -1,6 +1,6 @@
 <resources>
-    <color name="mux_bg">#F7F5FB</color>
-    <style name="Theme.Muxalot" parent="android:Theme.Material.Light.NoActionBar">
+    <color name="mux_bg">#121016</color>
+    <style name="Theme.Muxalot" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/mux_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
