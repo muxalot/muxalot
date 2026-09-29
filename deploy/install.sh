@@ -44,5 +44,13 @@ fetch() {
 fetch "$base/$name" "$tmp/$name"
 fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS"
 (cd "$tmp" && grep " $name\$" SHA256SUMS | sha256sum -c -)
+# The checksum only catches corruption (it comes from the same release). The build
+# attestation proves the binary was built from this repo by its release workflow.
+if gh attestation verify --help >/dev/null 2>&1; then
+  gh attestation verify "$tmp/$name" --repo muxalot/muxalot >/dev/null || { echo "build attestation check FAILED for $name; not installing" >&2; exit 1; }
+  echo "verified build attestation"
+else
+  echo "note: GitHub CLI 2.49+ not found, skipped build attestation check (see README: Verify a release)" >&2
+fi
 chmod +x "$tmp/$name"
 "$tmp/$name" install "$@"
