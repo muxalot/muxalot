@@ -20,6 +20,7 @@
       <a class="brand" href="/"><img src="favicon.svg" alt="">Muxalot</a>
       <nav>
         <a href="#how">How it works</a>
+        <a href="#updates">Updates</a>
         <a href="https://github.com/muxalot/muxalot">GitHub</a>
         <a href="privacy.html">Privacy</a>
       </nav>
@@ -75,6 +76,22 @@
           <li>The agent refuses to run as root, and there is no cloud relay: the app talks only to your server.</li>
           <li>Lost a phone? <code>muxalot-agent revoke &lt;id&gt;</code> cuts it off.</li>
         </ul>
+      </section>
+
+      <section id="updates">
+        <h2>Get release updates</h2>
+        <p>New versions and Play Store news. No spam, unsubscribe any time.</p>
+        <form class="signup" method="post" action="https://lists.tafoyaventures.com/subscription/form">
+          <input type="hidden" name="nonce">
+          <input type="hidden" name="next" value="https://muxalot.com/#updates">
+          <input type="hidden" name="l" value="92c61428-242f-42f9-b067-8b3054fa0d78">
+          <label class="sr" for="signup-email">Email</label>
+          <input id="signup-email" type="email" name="email" required autocomplete="email" placeholder="Email">
+          <label class="sr" for="signup-name">Name (optional)</label>
+          <input id="signup-name" type="text" name="name" autocomplete="given-name" placeholder="Name (optional)">
+          <button class="button primary" type="submit">Subscribe</button>
+        </form>
+        <p class="note">Your email is used only for Muxalot updates. See the <a href="privacy.html">privacy policy</a>.</p>
       </section>
 
       <section id="support">
