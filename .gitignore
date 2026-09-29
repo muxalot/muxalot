@@ -1,0 +1,9 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+*.apk
+/agent/ttyagent
+.env
+state.json
+CLAUDE.md

@@ -1,0 +1,27 @@
+# Serve at the ROOT of a (sub)domain: the agent verifies the signed request
+# path exactly as it receives it, so do not strip/rewrite a path prefix.
+
+# Environment: MUXALOT_DOMAIN (site hostname), MUXALOT_AGENT (agent host:port,
+# e.g. 127.0.0.1:8787), CLOUDFLARE_API_TOKEN (DNS-01 TLS).
+
+# Skip this snippet if your main Caddyfile already defines (cloudflare).
+(cloudflare) {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+		propagation_timeout 10m
+		propagation_delay 2m
+		resolvers 1.1.1.1 8.8.8.8
+	}
+}
+
+{$MUXALOT_DOMAIN} {
+	import cloudflare
+	reverse_proxy {$MUXALOT_AGENT} {
+		# Caddy sets X-Forwarded-For; the agent trusts it only from loopback.
+		flush_interval -1   # stream file downloads without buffering
+	}
+	# Optional: cap request bodies at the proxy as well (agent also enforces --max-upload-mb)
+	request_body {
+		max_size 2GB
+	}
+}
