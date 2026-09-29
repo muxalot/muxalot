@@ -150,7 +150,7 @@ fun SettingsScreen(
     Scaffold { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             ScreenHeader("Settings", onBack = onBack)
-            SettingRow("App lock", "Ask for the phone's screen lock when the app opens or returns after a minute away.", lockEnabled) { onToggleLock() }
+            SettingRow("App lock", "Ask for the phone's screen lock when the app opens, whenever the screen turns off, and after a minute away in another app.", lockEnabled) { onToggleLock() }
             SettingRow("Allow screenshots", "Off hides the app from screenshots, screen recording and the recent-apps preview.", allowScreenshots, onAllowScreenshots)
         }
     }
