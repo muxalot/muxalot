@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="xterm.css">
+<style>
+  @font-face { font-family: 'JetBrainsMono NFM'; src: url('JetBrainsMonoNerdFontMono-Regular.woff2') format('woff2'); }
+  html, body { margin: 0; height: 100%; background: #0b0f14; overflow: hidden; }
+  #t { position: absolute; inset: 0; padding: 2px; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .xterm-viewport { overflow: hidden !important; }
+</style>
+</head>
+<body>
+<div id="t"></div>
+<script src="xterm.js"></script>
+<script src="addon-fit.js"></script>
+<script>
+// Rendering only. All keyboard input is captured natively by the app and sent
+// straight to the WebSocket; this page never takes focus or IME input.
+(function () {
+  const term = new Terminal({
+    fontFamily: '"JetBrainsMono NFM", monospace',
+    fontSize: 14,
+    cursorBlink: true,
+    scrollback: 1000,
+    allowProposedApi: true,
+    theme: { background: '#0b0f14', foreground: '#d8dee9', cursor: '#ffcc66' },
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  const host = document.getElementById('t');
+  term.open(host);
+
+  function doFit() {
+    try { fit.fit(); } catch (e) {}
+  }
+  new ResizeObserver(doFit).observe(host);
+  // Cell size was measured with the fallback font; re-measure once the real one loads.
+  document.fonts.load('14px "JetBrainsMono NFM"').then(() => {
+    // xterm ignores an unchanged value, so bounce it to force a re-measure
+    const ff = term.options.fontFamily;
+    term.options.fontFamily = 'monospace';
+    term.options.fontFamily = ff;
+    doFit();
+  });
+  term.onResize(({ cols, rows }) => Android.onResize(cols, rows));
+
+  // --- mode reporting (application cursor keys, bracketed paste, mouse) ---
+  let lastModes = '';
+  function reportModes() {
+    const m = term.modes;
+    const s = [m.applicationCursorKeysMode, m.bracketedPasteMode, m.mouseTrackingMode].join('|');
+    if (s !== lastModes) {
+      lastModes = s;
+      Android.onModes(m.applicationCursorKeysMode, m.bracketedPasteMode, m.mouseTrackingMode);
+    }
+  }
+
+  // --- OSC 52: server-side clipboard writes (tmux/vim) -> phone clipboard ---
+  term.parser.registerOscHandler(52, (data) => {
+    const i = data.indexOf(';');
+    const payload = data.slice(i + 1);
+    if (payload === '?' || payload === '') return true; // reads not supported
+    try {
+      const bin = atob(payload);
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      Android.onClipboard(new TextDecoder().decode(bytes));
+    } catch (e) {}
+    return true;
+  });
+
+  window.tty = {
+    write(b64) {
+      const bin = atob(b64);
+      const u = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      term.write(u, reportModes);
+    },
+    reset() { term.reset(); lastModes = ''; },
+    fit: doFit,
+    setFont(n) { term.options.fontSize = n; doFit(); },
+    clearSelection() { term.clearSelection(); },
+  };
+
+  // --- touch: scroll, long-press select, tap to focus keyboard ---
+  const LONG_MS = 450, MOVE_PX = 10;
+  let t0 = null, timer = null, selecting = false, anchor = null, moved = false, acc = 0;
+
+  function metrics() {
+    const scr = host.querySelector('.xterm-screen');
+    const r = scr.getBoundingClientRect();
+    return { r, cw: r.width / term.cols, ch: r.height / term.rows };
+  }
+  function cellAt(x, y) {
+    const { r, cw, ch } = metrics();
+    const col = Math.max(0, Math.min(term.cols - 1, Math.floor((x - r.left) / cw)));
+    const vrow = Math.max(0, Math.min(term.rows - 1, Math.floor((y - r.top) / ch)));
+    return { col, vrow, row: vrow + term.buffer.active.viewportY };
+  }
+  function selectTo(c) {
+    let a = anchor, b = c;
+    if (b.row < a.row || (b.row === a.row && b.col < a.col)) { const t = a; a = b; b = t; }
+    term.select(a.col, a.row, (b.row - a.row) * term.cols + (b.col - a.col) + 1);
+  }
+
+  host.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { clearTimeout(timer); return; }
+    const p = e.touches[0];
+    t0 = { x: p.clientX, y: p.clientY };
+    moved = false; selecting = false; acc = 0;
+    term.clearSelection();
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!moved) {
+        selecting = true;
+        anchor = cellAt(t0.x, t0.y);
+        term.select(anchor.col, anchor.row, 1);
+      }
+    }, LONG_MS);
+  }, { passive: false });
+
+  host.addEventListener('touchmove', (e) => {
+    if (!t0) return;
+    e.preventDefault();
+    const p = e.touches[0];
+    if (selecting) { selectTo(cellAt(p.clientX, p.clientY)); return; }
+    const dy = p.clientY - t0.y;
+    if (!moved && Math.abs(dy) < MOVE_PX && Math.abs(p.clientX - t0.x) < MOVE_PX) return;
+    moved = true;
+    clearTimeout(timer);
+    const { ch } = metrics();
+    acc += p.clientY - (t0.last ?? t0.y);
+    t0.last = p.clientY;
+    const lines = Math.trunc(acc / ch);
+    if (lines === 0) return;
+    acc -= lines * ch;
+    if (term.modes.mouseTrackingMode !== 'none') {
+      // tmux mouse mode: translate swipes into SGR wheel events
+      const c = cellAt(p.clientX, p.clientY);
+      const btn = lines > 0 ? 64 : 65; // finger down = scroll back
+      let s = '';
+      for (let i = 0; i < Math.min(Math.abs(lines), 10); i++) s += '\x1b[<' + btn + ';' + (c.col + 1) + ';' + (c.vrow + 1) + 'M';
+      Android.onSend(s);
+    } else {
+      term.scrollLines(-lines);
+    }
+  }, { passive: false });
+
+  host.addEventListener('touchend', () => {
+    clearTimeout(timer);
+    if (selecting) {
+      const s = term.getSelection();
+      if (s) Android.onSelection(s);
+    } else if (!moved) {
+      Android.onTap();
+    }
+    t0 = null; selecting = false;
+  });
+
+  doFit();
+  Android.onReady(term.cols, term.rows);
+})();
+</script>
+</body>
+</html>
