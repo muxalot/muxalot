@@ -12,3 +12,4 @@ dist/
 *.keystore
 keystore.properties
 CLAUDE.md
+IMPLEMENTATION_PLAN.md
