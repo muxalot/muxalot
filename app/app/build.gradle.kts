@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "dev.muxalot"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.muxalot"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         // set by the Makefile from the latest git tag (-PversionName / -PversionCode)
         versionCode = providers.gradleProperty("versionCode").map { it.toInt() }.getOrElse(1)
         versionName = providers.gradleProperty("versionName").getOrElse("0.0.0-dev")
