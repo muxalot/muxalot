@@ -11,17 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: agent/go.mod
       - name: Build
-        working-directory: agent
-        run: |
-          mkdir -p ../dist
-          for arch in amd64 arm64; do
-            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o ../dist/muxalot-agent-linux-$arch .
-          done
-          cd ../dist && sha256sum muxalot-agent-linux-* > SHA256SUMS
+        run: make agent
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
