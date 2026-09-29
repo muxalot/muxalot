@@ -73,7 +73,7 @@ check-tag:
 	@[ -n "$(TAGGED)" ] && [ "$(TAGGED)" = "$(LAST)" ] || { echo "HEAD must be exactly the latest tag ($(LAST)): git checkout $(LAST)"; exit 1; }
 	@gh release view $(LAST) >/dev/null 2>&1 || { echo "no GitHub release for $(LAST) yet (CI publishes it after the tag push)"; exit 1; }
 
-release-agent: check-tag test agent ## rebuild the agent and upload it to the latest release
+release-agent: check-tag test agent ## rebuild the agent and upload it to the latest release (local build: no attestation, install.sh verification fails)
 	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-agent-linux-* $(DIST)/SHA256SUMS --clobber
 
 release-apk: check-tag apk ## build the signed APK and upload it to the latest release
