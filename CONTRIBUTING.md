@@ -32,7 +32,7 @@ Signing keys stay on the maintainer's machine. Create them once and describe the
 keytool -genkeypair -keystore ~/keystores/muxalot-apk.jks -alias apk -keyalg RSA -keysize 4096 -validity 10000
 keytool -genkeypair -keystore ~/keystores/muxalot-play.jks -alias play -keyalg RSA -keysize 4096 -validity 10000
 ```
-Use RSA (Play accepts RSA keys everywhere) and a validity of 10000 days (about 27 years). Keep the keystores outside the repo.
+Copy `app/keystore.properties.example` to `app/keystore.properties` and fill it in. Use RSA (Play accepts RSA keys everywhere) and a validity of 10000 days (about 27 years). Keep the keystores outside the repo.
 ```properties
 apk.storeFile=/home/you/keystores/muxalot-apk.jks
 apk.storePassword=...
