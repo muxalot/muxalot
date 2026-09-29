@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -99,6 +101,36 @@ func missingDeps(look func(string) (string, error)) []string {
 	return missing
 }
 
+// defaultServiceUser is the user who invoked sudo, else the dedicated account.
+func defaultServiceUser() string {
+	if u := os.Getenv("SUDO_USER"); u != "" && u != "root" {
+		return u
+	}
+	return "muxalot-agent"
+}
+
+// askUser prompts for the service user, discouraging root (which the agent refuses anyway).
+func askUser(def string, in io.Reader, out io.Writer) string {
+	r := bufio.NewReader(in)
+	for {
+		fmt.Fprintf(out, `Run the agent as which Unix user? It and every terminal you open will have this
+user's full access. A dedicated or your own account is safer than root; root is not allowed.
+User [%s]: `, def)
+		line, err := r.ReadString('\n')
+		u := strings.TrimSpace(line)
+		if u == "" {
+			u = def
+		}
+		if u != "root" {
+			return u
+		}
+		fmt.Fprintln(out, "root is not allowed: the agent refuses to run as root.")
+		if err != nil {
+			return def
+		}
+	}
+}
+
 func run(name string, args ...string) error {
 	out, err := exec.Command(name, args...).CombinedOutput()
 	if err != nil {
@@ -118,6 +150,17 @@ func runInstall(user, listen, filesRoot string) {
 	}
 	if _, err := os.Stat("/run/systemd/system"); err != nil {
 		log.Fatal("systemd is not running on this machine; run the agent yourself instead: muxalot-agent serve")
+	}
+	if user == "" {
+		user = defaultServiceUser()
+		// stdin is the curl pipe under `curl | sudo sh`, so ask on the terminal
+		if tty, err := os.Open("/dev/tty"); err == nil {
+			user = askUser(user, tty, os.Stdout)
+			tty.Close()
+		}
+	}
+	if user == "root" {
+		log.Fatal("refusing to install as root; use an unprivileged user")
 	}
 	if filesRoot == "" {
 		filesRoot = "/home/" + user
