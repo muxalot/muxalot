@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Muxalot: tmux sessions in your pocket</title>
+  <meta name="description" content="Muxalot is an open source Android terminal for your own Linux server. Sessions are tmux sessions, so they survive disconnects. MIT licensed.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="site">
+      <a class="brand" href="/"><img src="favicon.svg" alt="">Muxalot</a>
+      <nav>
+        <a href="#how">How it works</a>
+        <a href="https://github.com/muxalot/muxalot">GitHub</a>
+        <a href="privacy.html">Privacy</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="hero">
+        <img src="logo.svg" alt="Muxalot octopus mascot holding a terminal window">
+        <h1>Muxalot</h1>
+        <p class="lead">A remote terminal for Android that streams from your own Linux server. Every tab is a tmux session, so nothing is lost when the connection drops.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/muxalot/muxalot/releases">Download the free app</a>
+          <a class="button" href="https://github.com/muxalot/muxalot">View source on GitHub</a>
+        </div>
+        <p class="note">Open source under the MIT license. A supporter edition on Google Play is planned.</p>
+      </div>
+
+      <section id="features">
+        <h2>Built for people who live in tmux</h2>
+        <div class="grid">
+          <div class="card"><h3>Sessions that survive</h3><p>Sessions are real tmux sessions on your server. Lose signal, switch networks, close the app: reconnect and you are back where you were.</p></div>
+          <div class="card"><h3>Keys, not passwords</h3><p>Each phone generates a key pair in the Android Keystore. The private key never leaves the device, and every request is signed. Nothing to steal from the server.</p></div>
+          <div class="card"><h3>A real keyboard</h3><p>Esc, Tab, sticky Ctrl and Alt, arrows, function keys and a shortcut fan you can edit. Hardware keyboards work too.</p></div>
+          <div class="card"><h3>Clipboard and files</h3><p>Copy from tmux or vim to your phone with OSC 52, and browse, upload and download files from the server.</p></div>
+          <div class="card"><h3>Your server only</h3><p>No account, no cloud relay, no analytics. The app talks to the server you point it at and nothing else.</p></div>
+          <div class="card"><h3>Open source</h3><p>MIT licensed. Read the code, build it yourself, or send a pull request.</p></div>
+        </div>
+      </section>
+
+      <section id="how">
+        <h2>How it works</h2>
+        <pre><code>Android app  &lt;-&gt;  reverse proxy (TLS)  -&gt;  muxalot-agent (loopback)  -&gt;  PTY  -&gt;  tmux</code></pre>
+        <ol class="steps">
+          <li>Run <code>muxalot-agent</code> on a Linux server as an unprivileged user.</li>
+          <li>Put it behind a TLS reverse proxy such as Caddy, nginx or Apache. It must pass WebSockets and must not rewrite paths.</li>
+          <li>Run <code>muxalot-agent pair --url https://your.host</code>, scan the QR code in the app, and you are connected.</li>
+        </ol>
+        <p>Full setup steps, the auth design and the wire protocol are in the <a href="https://github.com/muxalot/muxalot#readme">README</a>.</p>
+      </section>
+
+      <section id="support">
+        <h2>Support the project</h2>
+        <p>Muxalot is free and stays free. If it saves you time, the supporter edition on Google Play (coming soon) and GitHub sponsorship help fund development.</p>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2026 Brian Tafoya. Released under the <a href="https://github.com/muxalot/muxalot/blob/main/LICENSE">MIT License</a>.
+        <a href="privacy.html">Privacy policy</a> &middot; <a href="https://github.com/muxalot/muxalot">GitHub</a></p>
+    </footer>
+  </div>
+</body>
+</html>
