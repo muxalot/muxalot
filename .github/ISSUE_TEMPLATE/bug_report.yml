@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: App version, `muxalot-agent` release, Android version, server distro
+  - type: input
+    id: proxy
+    attributes:
+      label: Reverse proxy
+      description: Caddy, nginx, Apache or other, and its version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Agent logs (`journalctl -u muxalot-agent`). Remove hostnames and anything private.
+      render: shell
