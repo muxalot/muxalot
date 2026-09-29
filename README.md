@@ -94,6 +94,10 @@ REST (all signed): `GET /sessions`, `DELETE /sessions/{name}`, `GET /ls?path=`, 
 
 Muxalot is free and stays free. If it saves you time, you can support development with GitHub Sponsors or with the supporter edition ("Muxalot Pro") on Google Play once it's listed. The pro build comes from the same source in this repo (`pro` flavor: `gradle :app:assembleProDebug`) and adds shortcut export/import, terminal color themes, and multi-file upload with progress bars. Everything else is identical to the free build.
 
+<a href="https://www.buymeacoffee.com/luckyedward"><img src="https://img.shields.io/badge/%F0%9F%8D%BA-Buy%20me%20a%20drink-BD5FFF?style=for-the-badge" alt="Buy me a drink"></a>
+
+<a href="https://www.buymeacoffee.com/luckyedward"><img src="assets/buy-me-a-coffee-qr-code.png" alt="Buy me a coffee QR code" width="160"></a>
+
 ## License
 
 muxalot is released under the [MIT License](LICENSE). Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
