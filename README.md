@@ -99,6 +99,8 @@ Open `app/` in Android Studio (the Gradle wrapper isn't included; Studio creates
 
 A small [Wails](https://wails.io) app (Go + a system webview running the same xterm.js). Go holds the device key, signs requests and owns the network connection; the page only draws the terminal and calls a short, fixed list of methods. Sessions are tmux tabs, same as the phone app, plus a file browser (download/upload through native file dialogs).
 
+Install from a release (amd64; Ubuntu 22.04, 24.04, 26.04 and Debian 12, 13, each of which the release workflow installs and launches before publishing): download `muxalot-desktop_<version>_amd64.deb` from the release page and run `sudo apt install ./muxalot-desktop_<version>_amd64.deb`. That installs `/usr/bin/muxalot-desktop` and an app-menu entry named muxalot. Verify the file first with `gh attestation verify muxalot-desktop_<version>_amd64.deb --repo muxalot/muxalot`. There is no apt repository and no package signing key, so the attestation is what ties the file to this repo's release workflow; `SHA256SUMS-desktop` only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails that check.
+
 Build (needs Go, `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`; running it needs `libwebkit2gtk-4.1`):
 
 ```
