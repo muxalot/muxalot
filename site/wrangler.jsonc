@@ -1,9 +1,0 @@
-{
-  "name": "muxalot",
-  "compatibility_date": "2026-09-29",
-  "assets": { "directory": "." },
-  "routes": [
-    { "pattern": "muxalot.com", "custom_domain": true },
-    { "pattern": "www.muxalot.com", "custom_domain": true }
-  ]
-}
