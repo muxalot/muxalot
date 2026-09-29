@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=muxalot
+Comment=Remote tmux terminal
+Exec=muxalot-desktop
+Icon=muxalot
+Terminal=false
+Categories=Network;RemoteAccess;
+StartupWMClass=muxalot-desktop
