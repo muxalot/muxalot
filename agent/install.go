@@ -86,6 +86,19 @@ func proxyConfig(kind, domain, upstream string) (string, error) {
 	return "", fmt.Errorf("unknown proxy type %q (use caddy, nginx or apache)", kind)
 }
 
+// installDeps are the commands the installer and the running agent rely on.
+var installDeps = []string{"systemctl", "useradd", "tmux"}
+
+func missingDeps(look func(string) (string, error)) []string {
+	var missing []string
+	for _, d := range installDeps {
+		if _, err := look(d); err != nil {
+			missing = append(missing, d)
+		}
+	}
+	return missing
+}
+
 func run(name string, args ...string) error {
 	out, err := exec.Command(name, args...).CombinedOutput()
 	if err != nil {
@@ -99,6 +112,12 @@ func run(name string, args ...string) error {
 func runInstall(user, listen, filesRoot string) {
 	if os.Getuid() != 0 {
 		log.Fatal("install must run as root, e.g. sudo muxalot-agent install")
+	}
+	if m := missingDeps(exec.LookPath); len(m) > 0 {
+		log.Fatalf("missing required commands: %s", strings.Join(m, ", "))
+	}
+	if _, err := os.Stat("/run/systemd/system"); err != nil {
+		log.Fatal("systemd is not running on this machine; run the agent yourself instead: muxalot-agent serve")
 	}
 	if filesRoot == "" {
 		filesRoot = "/home/" + user

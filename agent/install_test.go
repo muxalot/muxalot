@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,24 @@ func TestProxyConfigKeepsPathAndPassesWebSocket(t *testing.T) {
 func TestProxyConfigRejectsUnknownType(t *testing.T) {
 	if _, err := proxyConfig("haproxy", "h", "u"); err == nil {
 		t.Fatal("want error for unknown proxy type")
+	}
+}
+
+func TestMissingDeps(t *testing.T) {
+	have := map[string]bool{"systemctl": true, "useradd": true}
+	look := func(name string) (string, error) {
+		if have[name] {
+			return "/usr/bin/" + name, nil
+		}
+		return "", errors.New("not found")
+	}
+	got := missingDeps(look)
+	if len(got) != 1 || got[0] != "tmux" {
+		t.Fatalf("missingDeps = %v, want [tmux]", got)
+	}
+	have["tmux"] = true
+	if got := missingDeps(look); len(got) != 0 {
+		t.Fatalf("missingDeps = %v, want none", got)
 	}
 }
 
