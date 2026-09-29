@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install
 - **Which user:** the default dedicated user has an empty home and its own tmux, which is the most contained choice. To control your own machine (your tmux sessions, projects and shell), install with `--user <you>`. The agent still refuses to run as root.
 - **Proxy in Docker or on another host:** loopback is only reachable by a proxy on the same host and network namespace. If your proxy runs in a container or elsewhere, bind a LAN address with `--listen` and point the proxy at it. Restrict that port with a firewall to the proxy only. The agent trusts `X-Forwarded-For` only from loopback, so behind a non-loopback proxy the per-IP pairing rate limit is shared by all clients.
 - **Pairing:** run `pair` as the service user, for example `muxalot-agent pair --url https://your.host` when that is you, or `sudo -u muxalot-agent muxalot-agent pair …` for the default user. It must be the same user, because pairing state is stored in that user's config directory.
-- **Environment:** the service starts with systemd's minimal environment, not your login shell's, so new tmux sessions may lack your usual `PATH`. Existing tmux sessions are unaffected.
+- **Environment:** tmux starts sessions as login shells, so your `~/.profile` and `~/.bashrc` apply and your `PATH` additions are there. If a tmux server for that user is already running, new sessions inherit its environment. Only when the service itself starts the tmux server do sessions lack desktop-session variables such as `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` (so `systemctl --user` fails) and `SSH_AUTH_SOCK`.
 
 The bundled `deploy/Caddyfile` reads these environment variables:
 
