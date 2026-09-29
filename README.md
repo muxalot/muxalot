@@ -29,17 +29,19 @@ Android app (Compose)                         Linux server
 
 ## Server setup
 
+Requires Linux with `tmux` and a domain for TLS. Install the latest release (verifies its checksum, creates the `muxalot-agent` user, installs and starts the systemd unit):
+
 ```sh
-git clone https://github.com/muxalot/muxalot && cd muxalot
-cd agent && go build -o muxalot-agent .
-sudo install muxalot-agent /usr/local/bin/
-sudo useradd -m muxalot-agent            # the agent refuses to run as root
-sudo cp ../deploy/muxalot-agent.service /etc/systemd/system/ && sudo systemctl enable --now muxalot-agent
-# Caddy: see deploy/Caddyfile (serve at the root of a domain; don't rewrite paths)
+curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install.sh | sudo sh
+muxalot-agent proxy --type caddy --domain tty.example.com    # or nginx, apache: prints a reverse-proxy snippet
 sudo -u muxalot-agent muxalot-agent pair --url https://tty.example.com     # QR + one-time code
 ```
 
-Caddy reads these environment variables (see `deploy/Caddyfile`):
+To build from source instead: `git clone https://github.com/muxalot/muxalot && cd muxalot/agent && go build -o muxalot-agent . && sudo ./muxalot-agent install`.
+
+Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgrades, must not rewrite or strip the request path (the signature covers it), must send `X-Forwarded-For`, and must not buffer file streams or cap uploads too low. `muxalot-agent proxy` prints a snippet that does all of this.
+
+The bundled `deploy/Caddyfile` reads these environment variables:
 
 | Variable | Meaning |
 |---|---|

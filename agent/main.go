@@ -23,6 +23,8 @@ Usage:
   muxalot-agent devices [--data DIR]                                  list paired devices
   muxalot-agent add-key --name NAME (PUBKEY_B64 | @FILE) [--data DIR]  register a public key directly
   muxalot-agent revoke  ID [--data DIR]                               revoke a device
+  muxalot-agent install [--user muxalot-agent] [--listen ADDR] [--files-root DIR]   (root) install binary + systemd unit
+  muxalot-agent proxy   --type caddy|nginx|apache --domain HOST [--upstream ADDR]   print a reverse-proxy snippet
 `)
 	os.Exit(2)
 }
@@ -47,6 +49,10 @@ func main() {
 	maxUp := fs.Int64("max-upload-mb", 2048, "max upload size in MiB")
 	name := fs.String("name", "", "device name (add-key)")
 	pubURL := fs.String("url", "", "public https URL of this server (for pair)")
+	svcUser := fs.String("user", "muxalot-agent", "service user (install)")
+	proxyType := fs.String("type", "caddy", "proxy type: caddy, nginx or apache (proxy)")
+	domain := fs.String("domain", "", "public hostname (proxy)")
+	upstream := fs.String("upstream", "127.0.0.1:8787", "agent address the proxy forwards to (proxy)")
 
 	// allow the positional ID for `revoke` before/after flags
 	var positional []string
@@ -59,6 +65,29 @@ func main() {
 			positional = append(positional, args[0])
 			args = args[1:]
 		}
+	}
+
+	// these run without a state directory (install runs as root)
+	switch cmd {
+	case "install":
+		filesRoot := "" // default to the service user's home, not root's
+		fs.Visit(func(f *flag.Flag) {
+			if f.Name == "files-root" {
+				filesRoot = *root
+			}
+		})
+		runInstall(*svcUser, *listen, filesRoot)
+		return
+	case "proxy":
+		if *domain == "" {
+			log.Fatal("--domain is required, e.g. --domain tty.example.com")
+		}
+		cfg, err := proxyConfig(*proxyType, *domain, *upstream)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Print(cfg)
+		return
 	}
 
 	st, err := NewStore(*data)
