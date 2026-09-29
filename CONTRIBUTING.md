@@ -20,6 +20,30 @@ Tmux tests use a private `TMUX_TMPDIR` and are skipped if `tmux` isn't installed
 
 Open `app/` in Android Studio, or build from the command line with Gradle 8.10+ (`gradle :app:assembleFreeDebug`; the `pro` flavor is the Play supporter build from the same source). minSdk 26. There is no Gradle wrapper in the repo.
 
+## Building and releasing
+
+`make help` lists the targets: `make test`, `make agent` (linux amd64 and arm64 into `dist/`), `make apk` (signed free APK), `make aab` (signed pro bundle for Play), `make version`. Pass `GRADLE=/path/to/gradle` if Gradle 8.10+ isn't at the default wrapper path, and `GRADLE_FLAGS=--offline` to avoid network access.
+
+The version comes from git tags only (`vX.Y.Z`). Maintainers release with `make release` (bumps patch; `BUMP=minor|major`; `DRY=1` to preview), which tags and pushes. CI then publishes the agent binaries. `make release-apk` and `make release-agent` upload a locally built artifact to the latest release, and only run with that tag checked out.
+
+Signing keys stay on the maintainer's machine. Create them once and describe them in `app/keystore.properties` (gitignored):
+
+```sh
+keytool -genkeypair -keystore ~/keys/muxalot-apk.jks -alias apk -keyalg EC -groupname secp256r1 -validity 10000
+keytool -genkeypair -keystore ~/keys/muxalot-play.jks -alias play -keyalg EC -groupname secp256r1 -validity 10000
+```
+```properties
+apk.storeFile=/home/you/keys/muxalot-apk.jks
+apk.storePassword=...
+apk.keyAlias=apk
+apk.keyPassword=...
+play.storeFile=/home/you/keys/muxalot-play.jks
+play.storePassword=...
+play.keyAlias=play
+play.keyPassword=...
+```
+`apk` signs the GitHub APK; `play` is the Play upload key (Play App Signing holds the real signing key). Back up the APK key: losing it means installed users can't upgrade in place.
+
 ## Pull requests
 
 - Keep changes small and focused; one concern per PR.

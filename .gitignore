@@ -6,4 +6,8 @@ local.properties
 /agent/muxalot-agent
 .env
 state.json
+dist/
+*.jks
+*.keystore
+keystore.properties
 CLAUDE.md

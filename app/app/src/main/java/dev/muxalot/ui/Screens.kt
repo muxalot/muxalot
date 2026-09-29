@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import dev.muxalot.BuildConfig
 import dev.muxalot.Edition
 import dev.muxalot.R
 import dev.muxalot.data.DeviceKey
@@ -114,6 +115,12 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
                     }
                 }
             }
+            Text(
+                "Muxalot ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(8.dp),
+            )
         }
     }
     deleting?.let { s ->

@@ -14,6 +14,9 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 )
 
+// version is stamped by the Makefile: -ldflags "-X main.version=..."
+var version = "dev"
+
 func usage() {
 	fmt.Fprint(os.Stderr, `muxalot-agent - remote terminal agent (run behind a TLS reverse proxy such as Caddy)
 
@@ -25,6 +28,7 @@ Usage:
   muxalot-agent revoke  ID [--data DIR]                               revoke a device
   muxalot-agent install [--user muxalot-agent] [--listen ADDR] [--files-root DIR]   (root) install binary + systemd unit
   muxalot-agent proxy   --type caddy|nginx|apache --domain HOST [--upstream ADDR]   print a reverse-proxy snippet
+  muxalot-agent version                                               print the release version
 `)
 	os.Exit(2)
 }
@@ -69,6 +73,9 @@ func main() {
 
 	// these run without a state directory (install runs as root)
 	switch cmd {
+	case "version":
+		fmt.Println(version)
+		return
 	case "install":
 		filesRoot := "" // default to the service user's home, not root's
 		fs.Visit(func(f *flag.Flag) {
