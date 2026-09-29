@@ -1,7 +1,10 @@
 package dev.muxalot
 
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +73,13 @@ class MainActivity : ComponentActivity() {
         else window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
     }
 
+    /** Screen off (timeout or power button) locks at once, so waking the phone always asks again. */
+    private val screenOff = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (appLock.enabled && !locked) { locked = true; promptOnStart = true }
+        }
+    }
+
     private fun unlock() {
         if (!askCredential()) locked = false // no screen lock left, so nothing to check against
     }
@@ -97,6 +107,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         appLock = AppLock(this)
+        registerReceiver(screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF))
         settings = AppSettings(this)
         allowScreenshots = settings.allowScreenshots
         applyScreenshotSetting()
@@ -138,6 +149,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(screenOff)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
