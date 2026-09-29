@@ -41,6 +41,15 @@ The installer prompts for the user, defaulting to the account that ran `sudo` (o
 
 To build from source instead: `git clone https://github.com/muxalot/muxalot && cd muxalot/agent && go build -o muxalot-agent . && sudo ./muxalot-agent install`.
 
+### Verify a release
+
+`install.sh` checks the SHA-256 (corruption only) and, when GitHub CLI 2.49+ is installed, the build attestation that proves the binary came from this repo's release workflow. To check by hand, or to inspect the script before running it:
+
+```sh
+gh attestation verify muxalot-agent-linux-amd64 --repo muxalot/muxalot
+curl -fsSLO https://raw.githubusercontent.com/muxalot/muxalot/v0.2.0/deploy/install.sh   # pin a tag, read it, then: sudo sh install.sh
+```
+
 Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgrades, must not rewrite or strip the request path (the signature covers it), must send `X-Forwarded-For`, and must not buffer file streams or cap uploads too low. `muxalot-agent proxy` prints a snippet that does all of this.
 
 ### Install options
@@ -72,7 +81,7 @@ The bundled `deploy/Caddyfile` reads these environment variables:
 
 Recommended `~muxalot-agent/.tmux.conf`: `set -g mouse on` (swipe-to-scroll in the app maps to tmux wheel events). The agent sets `set-clipboard on` itself.
 
-Files: uploads/downloads are confined to `--files-root` (default: the agent user's home), symlink-safe, size-capped by `--max-upload-mb`.
+Files: uploads/downloads are confined to `--files-root` (default: the agent user's home), symlink-safe, size-capped by `--max-upload-mb`. New uploads are created `0600`. The confinement guards the file endpoints, not a paired device: a paired device already has a shell as the agent's user.
 
 ## Android app
 
@@ -84,6 +93,7 @@ Open `app/` in Android Studio (the Gradle wrapper isn't included; Studio creates
 - **Clipboard**: OSC 52 from tmux/vim goes to the phone clipboard; long-press-drag selects and copies; the menu has Paste, "Send clipboard to server" (tmux buffer) and "Copy server clipboard".
 - **Files**: browse, upload (system picker), download (system save dialog).
 - **Multi-server**: saved list, each server with its own Keystore key.
+- **Settings**: optional app lock (asks for the phone's screen lock on open, whenever the screen turns off, and after a minute in another app), and "Allow screenshots" (off by default in release builds: hides the app from screenshots, recording and recents).
 
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 
@@ -106,6 +116,7 @@ Third-party components: Termux's terminal libraries were **not** used: `Terminal
 
 ## Known limitations / next steps
 
+- Security review with findings and a threat model: [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md).
 - Upload/download bodies are protected by TLS and the signed request line, but the body itself isn't signed.
 - The server certificate is validated against the system CA store (no pinning), which suits Caddy with Let's Encrypt.
 - Not yet done: background keep-alive service, scrollback search, pinch-zoom, Play Store polish (icon, onboarding).
