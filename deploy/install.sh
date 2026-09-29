@@ -34,8 +34,15 @@ base="https://github.com/muxalot/muxalot/releases/latest/download"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-curl -fsSL -o "$tmp/$name" "$base/$name"
-curl -fsSL -o "$tmp/SHA256SUMS" "$base/SHA256SUMS"
+fetch() {
+  curl -fsSL -o "$2" "$1" || {
+    echo "download failed: $1" >&2
+    echo "no release published yet? see https://github.com/muxalot/muxalot/releases" >&2
+    exit 1
+  }
+}
+fetch "$base/$name" "$tmp/$name"
+fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS"
 (cd "$tmp" && grep " $name\$" SHA256SUMS | sha256sum -c -)
 chmod +x "$tmp/$name"
 "$tmp/$name" install "$@"
