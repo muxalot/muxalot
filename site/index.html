@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Muxalot: tmux sessions in your pocket</title>
   <meta name="description" content="Muxalot is an open source Android terminal for your own Linux server. Sessions are tmux sessions, so they survive disconnects. MIT licensed.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Muxalot: tmux sessions in your pocket">
+  <meta property="og:description" content="Open source Android terminal for your own Linux server. Sessions are tmux sessions, so they survive disconnects.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/muxalot/muxalot/main/assets/social-preview.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -31,6 +36,12 @@
         <p class="note">Open source under the MIT license. A supporter edition on Google Play is planned.</p>
       </div>
 
+      <section id="screens" class="shots">
+        <img src="mock-servers.svg" alt="Muxalot server list with two servers">
+        <img src="mock-terminal.svg" alt="Muxalot terminal with tabs, a tmux session and the extra-keys row">
+        <img src="mock-files.svg" alt="Muxalot file browser with an Upload button">
+      </section>
+
       <section id="features">
         <h2>Built for people who live in tmux</h2>
         <div class="grid">
@@ -47,11 +58,23 @@
         <h2>How it works</h2>
         <pre><code>Android app  &lt;-&gt;  reverse proxy (TLS)  -&gt;  muxalot-agent (loopback)  -&gt;  PTY  -&gt;  tmux</code></pre>
         <ol class="steps">
-          <li>Run <code>muxalot-agent</code> on a Linux server as an unprivileged user.</li>
-          <li>Put it behind a TLS reverse proxy such as Caddy, nginx or Apache. It must pass WebSockets and must not rewrite paths.</li>
-          <li>Run <code>muxalot-agent pair --url https://your.host</code>, scan the QR code in the app, and you are connected.</li>
+          <li>Install the agent on a Linux server. It asks which Unix user to run as (your own account by default; root is refused) and starts a systemd service.</li>
+          <li>Put it behind a TLS reverse proxy such as Caddy, nginx or Apache. <code>muxalot-agent proxy --type caddy --domain your.host</code> prints a working snippet. It must pass WebSockets and must not rewrite paths.</li>
+          <li>Run <code>muxalot-agent pair --url https://your.host</code> as that same user, scan the QR code in the app, and you are connected.</li>
         </ol>
+        <pre id="install"><code>curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install.sh | sudo sh</code></pre>
         <p>Full setup steps, the auth design and the wire protocol are in the <a href="https://github.com/muxalot/muxalot#readme">README</a>.</p>
+      </section>
+
+      <section id="security">
+        <h2>Security</h2>
+        <ul>
+          <li>The phone's private key is generated in the Android Keystore and never leaves the device. The server stores public keys only, so there is no password or token to steal.</li>
+          <li>Every request, including the WebSocket upgrade, is signed. A signature is valid for 60 seconds and each nonce works once, so captured requests cannot be replayed.</li>
+          <li>Pairing codes are single use, expire in 10 minutes and are rate limited per IP. Unauthenticated requests get a bare 404.</li>
+          <li>The agent refuses to run as root, and there is no cloud relay: the app talks only to your server.</li>
+          <li>Lost a phone? <code>muxalot-agent revoke &lt;id&gt;</code> cuts it off.</li>
+        </ul>
       </section>
 
       <section id="support">
@@ -65,5 +88,20 @@
         <a href="privacy.html">Privacy policy</a> &middot; <a href="https://github.com/muxalot/muxalot">GitHub</a></p>
     </footer>
   </div>
+  <script>
+    // copy button for the install command; the page works without it
+    (function () {
+      var pre = document.getElementById("install");
+      if (!pre || !navigator.clipboard) return;
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "copy"; b.textContent = "Copy";
+      b.onclick = function () {
+        navigator.clipboard.writeText(pre.textContent.trim()).then(function () {
+          b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500);
+        });
+      };
+      pre.insertAdjacentElement("afterend", b);
+    })();
+  </script>
 </body>
 </html>
