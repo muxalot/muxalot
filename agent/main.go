@@ -15,23 +15,23 @@ import (
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, `ttyagent - remote terminal agent (run behind a TLS reverse proxy such as Caddy)
+	fmt.Fprint(os.Stderr, `muxalot-agent - remote terminal agent (run behind a TLS reverse proxy such as Caddy)
 
 Usage:
-  ttyagent serve   [--listen 127.0.0.1:8787] [--data DIR] [--files-root DIR] [--max-upload-mb 2048]
-  ttyagent pair    --url https://tty.example.com [--data DIR]   print QR + one-time code
-  ttyagent devices [--data DIR]                                  list paired devices
-  ttyagent add-key --name NAME (PUBKEY_B64 | @FILE) [--data DIR]  register a public key directly
-  ttyagent revoke  ID [--data DIR]                               revoke a device
+  muxalot-agent serve   [--listen 127.0.0.1:8787] [--data DIR] [--files-root DIR] [--max-upload-mb 2048]
+  muxalot-agent pair    --url https://tty.example.com [--data DIR]   print QR + one-time code
+  muxalot-agent devices [--data DIR]                                  list paired devices
+  muxalot-agent add-key --name NAME (PUBKEY_B64 | @FILE) [--data DIR]  register a public key directly
+  muxalot-agent revoke  ID [--data DIR]                               revoke a device
 `)
 	os.Exit(2)
 }
 
 func defaultDataDir() string {
 	if d, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(d, "ttyagent")
+		return filepath.Join(d, "muxalot-agent")
 	}
-	return ".ttyagent"
+	return ".muxalot-agent"
 }
 
 func main() {

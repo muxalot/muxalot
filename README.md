@@ -6,7 +6,7 @@ Remote terminal for Android, streamed from a Linux server. Sessions are tmux ses
 
 ```
 Android app (Compose)                         Linux server
- xterm.js (render) + native key capture  <->  Caddy (TLS) -> ttyagent (Go, 127.0.0.1:8787) -> PTY -> tmux
+ xterm.js (render) + native key capture  <->  Caddy (TLS) -> muxalot-agent (Go, 127.0.0.1:8787) -> PTY -> tmux
 ```
 
 ## Status
@@ -25,21 +25,21 @@ Android app (Compose)                         Linux server
   signed over `"muxalot-v1\nMETHOD\nHOST\nREQUEST_URI\nts\nnonce"`.
   Timestamps must be within 60 s and each nonce works once, so captured headers can't be replayed. The phone clock must be roughly correct.
 - Pairing codes are single use, expire in 10 minutes, and failed attempts are rate limited per IP (10 per 15 min). Unauthenticated requests get a bare 404.
-- Revoke a lost phone: `ttyagent revoke <id>`. Admins can also register a key directly: `ttyagent add-key --name laptop @pubkey.b64` (base64 X.509 SPKI, P-256).
+- Revoke a lost phone: `muxalot-agent revoke <id>`. Admins can also register a key directly: `muxalot-agent add-key --name laptop @pubkey.b64` (base64 X.509 SPKI, P-256).
 
 ## Server setup
 
 ```sh
 git clone https://github.com/muxalot/muxalot && cd muxalot
-cd agent && go build -o ttyagent .
-sudo install ttyagent /usr/local/bin/
-sudo useradd -m ttyagent            # the agent refuses to run as root
-sudo cp ../deploy/ttyagent.service /etc/systemd/system/ && sudo systemctl enable --now ttyagent
+cd agent && go build -o muxalot-agent .
+sudo install muxalot-agent /usr/local/bin/
+sudo useradd -m muxalot-agent            # the agent refuses to run as root
+sudo cp ../deploy/muxalot-agent.service /etc/systemd/system/ && sudo systemctl enable --now muxalot-agent
 # Caddy: see deploy/Caddyfile (serve at the root of a domain; don't rewrite paths)
-sudo -u ttyagent ttyagent pair --url https://tty.example.com     # QR + one-time code
+sudo -u muxalot-agent muxalot-agent pair --url https://tty.example.com     # QR + one-time code
 ```
 
-Recommended `~ttyagent/.tmux.conf`: `set -g mouse on` (swipe-to-scroll in the app maps to tmux wheel events). The agent sets `set-clipboard on` itself.
+Recommended `~muxalot-agent/.tmux.conf`: `set -g mouse on` (swipe-to-scroll in the app maps to tmux wheel events). The agent sets `set-clipboard on` itself.
 
 Files: uploads/downloads are confined to `--files-root` (default: the agent user's home), symlink-safe, size-capped by `--max-upload-mb`.
 
