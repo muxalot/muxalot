@@ -2,11 +2,12 @@
 
 Open source under the [MIT License](LICENSE). Website: <https://muxalot.com>. Source and issues: <https://github.com/muxalot/muxalot>. Play Store testers: [join the closed test](https://play.google.com/apps/testing/dev.muxalot.pro) / [Play listing](https://play.google.com/store/apps/details?id=dev.muxalot.pro)
 
-Remote terminal for Android, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session.
+Remote terminal for Android and Linux desktops, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session. Get the Linux desktop app as a `.deb` from the [latest release](https://github.com/muxalot/muxalot/releases/latest) ([install steps](#install-ubuntu-and-debian-amd64)).
 
 ```
 Android app (Compose)                         Linux server
  xterm.js (render) + native key capture  <->  Caddy (TLS) -> muxalot-agent (Go, 127.0.0.1:8787) -> PTY -> tmux
+Linux desktop app (Wails, xterm.js)      <->  (same agent, same signed requests)
 ```
 
 ## Status
@@ -15,6 +16,7 @@ Android app (Compose)                         Linux server
 |---|---|
 | `agent/` | Built and tested (`go test ./...`): pairing, signed-request auth, replay/forgery rejection, rate limiting, path-traversal/symlink checks, upload limits, tmux persistence across a dropped connection, clipboard. |
 | `app/` | Working Android app: terminal, tabs, clipboard, files, multi-server. No automated tests yet. |
+| `desktop/` | Working Linux desktop app (Go + Wails): terminal, tabs, files, multi-server. Released as a `.deb` for Ubuntu 22.04/24.04/26.04 and Debian 12/13 (amd64). Tests include an end-to-end run against the real agent. |
 
 ## Auth: public/private keys
 
@@ -49,6 +51,8 @@ To build from source instead: `git clone https://github.com/muxalot/muxalot && c
 gh attestation verify muxalot-agent-linux-amd64 --repo muxalot/muxalot
 curl -fsSLO https://raw.githubusercontent.com/muxalot/muxalot/v0.2.0/deploy/install.sh   # pin a tag, read it, then: sudo sh install.sh
 ```
+
+The desktop app's `.deb` is verified the same way; see [Desktop app](#install-ubuntu-and-debian-amd64).
 
 Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgrades, must not rewrite or strip the request path (the signature covers it), must send `X-Forwarded-For`, and must not buffer file streams or cap uploads too low. `muxalot-agent proxy` prints a snippet that does all of this.
 
@@ -99,22 +103,48 @@ Open `app/` in Android Studio (the Gradle wrapper isn't included; Studio creates
 
 A small [Wails](https://wails.io) app (Go + a system webview running the same xterm.js). Go holds the device key, signs requests and owns the network connection; the page only draws the terminal and calls a short, fixed list of methods. Sessions are tmux tabs, same as the phone app, plus a file browser (download/upload through native file dialogs).
 
-Install from a release (amd64; Ubuntu 22.04, 24.04, 26.04 and Debian 12, 13, each of which the release workflow installs and launches before publishing): download `muxalot-desktop_<version>_amd64.deb` from the release page and run `sudo apt install ./muxalot-desktop_<version>_amd64.deb`. That installs `/usr/bin/muxalot-desktop` and an app-menu entry named muxalot. Verify the file first with `gh attestation verify muxalot-desktop_<version>_amd64.deb --repo muxalot/muxalot`. There is no apt repository and no package signing key, so the attestation is what ties the file to this repo's release workflow; `SHA256SUMS-desktop` only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails that check.
+### Install (Ubuntu and Debian, amd64)
 
-Build (needs Go, `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`; running it needs `libwebkit2gtk-4.1`):
+Supported: Ubuntu 22.04, 24.04, 26.04 and Debian 12, 13. The release workflow installs the package and launches the app on each of these before it publishes a release. It needs a graphical session (Wayland or X11).
+
+```sh
+# 1. download the .deb from the latest release (or use the browser: https://github.com/muxalot/muxalot/releases/latest)
+gh release download --repo muxalot/muxalot --pattern 'muxalot-desktop_*_amd64.deb'
+# 2. verify it came from this repo's release workflow (GitHub CLI 2.49+)
+gh attestation verify muxalot-desktop_*_amd64.deb --repo muxalot/muxalot
+# 3. install; apt pulls in GTK 3 and WebKitGTK 4.1
+sudo apt install ./muxalot-desktop_*_amd64.deb
+```
+
+Start it from your app menu (**muxalot**) or run `muxalot-desktop`. To upgrade, install the newer `.deb` the same way. To remove it: `sudo apt remove muxalot-desktop`; your saved servers and keys stay in `~/.config/muxalot`.
+
+- **Trust:** there is no apt repository and no package signing key, so the attestation in step 2 is what ties the file to this repo's release workflow. `SHA256SUMS-desktop` in the release only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails step 2.
+- **Key storage:** the "OS keyring" option needs a Secret Service provider such as GNOME Keyring or KWallet (the package recommends `gnome-keyring`). Without one, choose the passphrase-protected file when pairing.
+- **Other systems:** other distros, arm64, macOS and Windows have no package yet. Build from source below.
+
+### Build from source
+
+Needs Go, `libgtk-3-dev` and `libwebkit2gtk-4.1-dev`; running it needs `libwebkit2gtk-4.1`:
 
 ```
 make desktop            # dist/muxalot-desktop-linux-amd64
 make desktop-test       # vet + tests; the end-to-end test builds and runs the real agent (needs tmux)
+make deb                # dist/muxalot-desktop_<version>_amd64.deb for this machine (needs dpkg-dev fakeroot); see below
 ```
 
+A `.deb` you build with `make deb` takes its dependency names from the machine that built it, so one built on Ubuntu 24.04 will not install on Ubuntu 22.04 or Debian 12. Release packages are built on Ubuntu 22.04 for that reason.
+
+### If it does not start
+
 On start it checks that a graphical session and a D-Bus session bus exist, and stops with a list of what is missing if not (`muxalot-desktop --check` runs only that check). If the window never finishes loading (usually a WebKitGTK/GPU problem) it exits after 20 s with a hint: try `WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1`. On Linux the app hides `.woff`/`.woff2` system fonts from its own process (they are never visible to other programs): Debian/Ubuntu's `fonts-opendyslexic` installs such files, fontconfig then picks them for every font request, and WebKitGTK's page thread spins at 100% CPU so the window never loads. A missing `libwebkit2gtk-4.1` or GTK3 can't be reported by the app itself: the system loader stops the program first and prints `error while loading shared libraries`, which names the package to install. The binary is dynamically linked, so build it on (or for) a system no newer than the one that runs it.
+
+### Pairing and use
 
 Pair: run `muxalot-agent pair --url https://your.host` on the server, then enter the URL and code (or paste the `muxalot://pair` link into the URL field). Pick where the device key lives: the OS keyring (Secret Service / Keychain), or a passphrase-protected file (argon2id + XChaCha20-Poly1305) asked for at launch. There is no silent fallback from one to the other. The key is software-held, not hardware-bound; forget a lost machine with `muxalot-agent revoke <id>` on the server.
 
 Shortcuts: Ctrl+Shift+C copy selection, Ctrl+Shift+V paste, Ctrl+`+` / `-` / `0` zoom. The terminal asking to set your clipboard (OSC 52) always needs a click on Copy.
 
-Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update, installers, macOS/Windows builds (untested).
+Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb`), rpm/AppImage packages, macOS/Windows builds (untested).
 
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 
