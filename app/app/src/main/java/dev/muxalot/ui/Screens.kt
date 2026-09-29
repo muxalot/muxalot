@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -186,7 +187,12 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
     var status by remember { mutableStateOf<String?>(null) }
     var pendingDownload by remember { mutableStateOf<String?>(null) }
     var pendingUpload by remember { mutableStateOf<Triple<Uri, String, Long>?>(null) }
+    var progress by remember { mutableStateOf<Float?>(null) } // pro: transfer progress 0..1
     BackHandler(onBack = onBack)
+
+    fun track(done: Long, total: Long) {
+        if (Edition.isPro && total > 0) progress = done.toFloat() / total
+    }
 
     fun refresh() {
         scope.launch {
@@ -215,13 +221,14 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
             status = "Downloading…"
             try {
                 withContext(Dispatchers.IO) {
-                    ctx.contentResolver.openOutputStream(uri)!!.use { api.download(remote, it) }
+                    ctx.contentResolver.openOutputStream(uri)!!.use { api.download(remote, it, ::track) }
                 }
                 status = "Downloaded"
             } catch (e: Exception) {
                 status = "Download failed: ${e.message}"
             } finally {
                 busy = false
+                progress = null
             }
         }
     }
@@ -232,7 +239,7 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
             status = "Uploading $name…"
             try {
                 withContext(Dispatchers.IO) {
-                    api.upload(join(shown, name), size, overwrite) { ctx.contentResolver.openInputStream(uri)!! }
+                    api.upload(join(shown, name), size, overwrite, { track(it, size) }) { ctx.contentResolver.openInputStream(uri)!! }
                 }
                 status = "Uploaded $name"
                 refresh()
@@ -242,21 +249,61 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
                 status = "Upload failed: ${e.message}"
             } finally {
                 busy = false
+                progress = null
             }
         }
     }
 
+    /** Display name and size (-1 if unknown) of a picked document. */
+    fun meta(uri: Uri): Pair<String, Long> {
+        var name = "upload"
+        var size = -1L
+        ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = c.getString(it) }
+                c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }?.let { size = c.getLong(it) }
+            }
+        }
+        return name to size
+    }
+
     val upload = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            var name = "upload"
-            var size = -1L
-            ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
-                if (c.moveToFirst()) {
-                    c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = c.getString(it) }
-                    c.getColumnIndex(OpenableColumns.SIZE).takeIf { it >= 0 }?.let { size = c.getLong(it) }
+            val (name, size) = meta(uri)
+            doUpload(uri, name, size, overwrite = false)
+        }
+    }
+
+    // pro: several files in one go, uploaded one after another; existing names are skipped
+    val uploadMany = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) scope.launch {
+            busy = true
+            var ok = 0
+            val skipped = mutableListOf<String>()
+            var failure: String? = null
+            for ((i, uri) in uris.withIndex()) {
+                val (name, size) = meta(uri)
+                status = "Uploading ${i + 1}/${uris.size}: $name"
+                try {
+                    withContext(Dispatchers.IO) {
+                        api.upload(join(shown, name), size, false, { track(it, size) }) { ctx.contentResolver.openInputStream(uri)!! }
+                    }
+                    ok++
+                } catch (e: ApiException) {
+                    if (e.code == 409) skipped += name else { failure = "$name: ${e.message}"; break }
+                } catch (e: Exception) {
+                    failure = "$name: ${e.message}"
+                    break
                 }
             }
-            doUpload(uri, name, size, overwrite = false)
+            progress = null
+            busy = false
+            status = buildString {
+                append("Uploaded $ok of ${uris.size}")
+                if (skipped.isNotEmpty()) append("; already exist: ${skipped.joinToString()}")
+                failure?.let { append("; failed: $it") }
+            }
+            refresh()
         }
     }
 
@@ -265,13 +312,17 @@ fun FilesScreen(server: Server, onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Files") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("‹ Back") } },
-                actions = { TextButton(onClick = { upload.launch(arrayOf("*/*")) }) { Text("Upload") } },
+                actions = {
+                    TextButton(onClick = { if (Edition.isPro) uploadMany.launch(arrayOf("*/*")) else upload.launch(arrayOf("*/*")) }) { Text("Upload") }
+                },
             )
         },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             Text(shown, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
-            if (busy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp))
+            val p = progress
+            if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+            else if (busy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp))
             status?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall) }
             LazyColumn(Modifier.weight(1f)) {
                 item {

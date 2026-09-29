@@ -80,6 +80,7 @@
     reset() { term.reset(); lastModes = ''; },
     fit: doFit,
     setFont(n) { term.options.fontSize = n; doFit(); },
+    setTheme(t) { term.options.theme = t; document.body.style.background = t.background; },
     clearSelection() { term.clearSelection(); },
   };
 

@@ -71,7 +71,7 @@ REST (all signed): `GET /sessions`, `DELETE /sessions/{name}`, `GET /ls?path=`, 
 
 ## Support the project
 
-Muxalot is free and stays free. If it saves you time, you can support development with GitHub Sponsors or with the supporter edition ("Muxalot Pro") on Google Play once it's listed. The pro build comes from the same source in this repo (`pro` flavor).
+Muxalot is free and stays free. If it saves you time, you can support development with GitHub Sponsors or with the supporter edition ("Muxalot Pro") on Google Play once it's listed. The pro build comes from the same source in this repo (`pro` flavor: `gradle :app:assembleProDebug`) and adds shortcut export/import, terminal color themes, and multi-file upload with progress bars. Everything else is identical to the free build.
 
 ## License
 

@@ -76,6 +76,30 @@ object DeviceKey {
     }
 }
 
+/** Terminal color presets (pro). Values are xterm.js theme objects; the ANSI palette stays xterm's default. */
+object Themes {
+    val presets = linkedMapOf(
+        "Default" to """{"background":"#0b0f14","foreground":"#d8dee9","cursor":"#ffcc66"}""",
+        "Dracula" to """{"background":"#282a36","foreground":"#f8f8f2","cursor":"#f8f8f0"}""",
+        "Nord" to """{"background":"#2e3440","foreground":"#d8dee9","cursor":"#88c0d0"}""",
+        "Solarized Dark" to """{"background":"#002b36","foreground":"#839496","cursor":"#93a1a1"}""",
+        "Gruvbox Dark" to """{"background":"#282828","foreground":"#ebdbb2","cursor":"#fe8019"}""",
+        "Light" to """{"background":"#ffffff","foreground":"#24292f","cursor":"#0969da","selectionBackground":"#b6d6ff"}""",
+    )
+}
+
+class ThemeStore(ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("theme", Context.MODE_PRIVATE)
+
+    fun name(): String = prefs.getString("name", null)?.takeIf { it in Themes.presets } ?: "Default"
+
+    fun setName(n: String) {
+        prefs.edit().putString("name", n).apply()
+    }
+
+    fun themeJson(): String = Themes.presets.getValue(name())
+}
+
 /** A user-defined fan key: [label] is the short face text, [text] is typed into the terminal. */
 @Serializable
 data class Shortcut(val label: String, val text: String, val enter: Boolean)
@@ -91,6 +115,11 @@ class ShortcutStore(ctx: Context) {
     fun save(list: List<Shortcut>) {
         prefs.edit().putString("list", json.encodeToString(list)).apply()
     }
+
+    fun toJson(list: List<Shortcut>): String = json.encodeToString(list)
+
+    /** Throws on malformed input. */
+    fun parse(text: String): List<Shortcut> = json.decodeFromString(text)
 
     companion object {
         val DEFAULTS = listOf(

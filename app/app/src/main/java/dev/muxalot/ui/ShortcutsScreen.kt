@@ -29,8 +29,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.platform.LocalContext
+import dev.muxalot.Edition
 import dev.muxalot.data.Shortcut
 import dev.muxalot.data.ShortcutStore
+import dev.muxalot.data.ThemeStore
+import dev.muxalot.data.Themes
 
 private const val MAX_LABEL = 4 // fits the round fan button
 
@@ -44,6 +51,28 @@ fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
     fun update(new: List<Shortcut>) { list = new; store.save(new) }
     BackHandler(onBack = onBack)
 
+    // pro: shortcut backup and terminal themes
+    val ctx = LocalContext.current
+    val themes = remember { ThemeStore(ctx) }
+    var theme by remember { mutableStateOf(themes.name()) }
+    var pickingTheme by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf<String?>(null) }
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) note = runCatching {
+            ctx.contentResolver.openOutputStream(uri)!!.use { it.write(store.toJson(list).toByteArray()) }
+            "Exported ${list.size} shortcuts"
+        }.getOrElse { "Export failed: ${it.message}" }
+    }
+    val import = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) note = runCatching {
+            val text = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
+            val valid = store.parse(text).filter { it.text.isNotEmpty() && it.label.isNotEmpty() }
+                .map { it.copy(label = it.label.take(MAX_LABEL)) }
+            update(valid)
+            "Imported ${valid.size} shortcuts"
+        }.getOrElse { "Import failed: ${it.message}" }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,6 +83,17 @@ fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
         },
     ) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+            if (Edition.isPro) item {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { export.launch("muxalot-shortcuts.json") }) { Text("Export") }
+                        OutlinedButton(onClick = { import.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Text("Import (replaces list)") }
+                    }
+                    OutlinedButton(onClick = { pickingTheme = true }) { Text("Theme: $theme") }
+                    note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+                HorizontalDivider()
+            }
             itemsIndexed(list) { i, s ->
                 Row(
                     Modifier.fillMaxWidth().clickable { editing = i }.padding(16.dp),
@@ -72,6 +112,24 @@ fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
                 HorizontalDivider()
             }
         }
+    }
+
+    if (pickingTheme) {
+        AlertDialog(
+            onDismissRequest = { pickingTheme = false },
+            title = { Text("Terminal theme") },
+            text = {
+                Column {
+                    Themes.presets.keys.forEach { n ->
+                        TextButton(onClick = { themes.setName(n); theme = n; pickingTheme = false }) {
+                            Text(if (n == theme) "✓ $n" else n)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { pickingTheme = false }) { Text("Cancel") } },
+        )
     }
 
     editing?.let { idx ->

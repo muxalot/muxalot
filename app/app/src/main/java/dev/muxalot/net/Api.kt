@@ -14,7 +14,6 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.BufferedSink
-import okio.source
 import org.json.JSONObject
 import java.io.IOException
 import java.io.InputStream
@@ -114,20 +113,42 @@ class Api(private val server: Server) {
             json.decodeFromString(r.body!!.string())
         }
 
-    fun download(path: String, out: OutputStream) {
+    /** [onProgress] gets (bytes so far, total or -1 if unknown). */
+    fun download(path: String, out: OutputStream, onProgress: (Long, Long) -> Unit = { _, _ -> }) {
         client.newCall(request("GET", url("files", query = mapOf("path" to path)))).execute().use { r ->
             check(r)
-            r.body!!.byteStream().copyTo(out)
+            val total = r.body!!.contentLength()
+            val buf = ByteArray(64 * 1024)
+            var done = 0L
+            r.body!!.byteStream().use { input ->
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                    done += n
+                    onProgress(done, total)
+                }
+            }
         }
     }
 
-    /** Throws ApiException(409) if the file exists and [overwrite] is false. */
-    fun upload(path: String, length: Long, overwrite: Boolean, open: () -> InputStream) {
+    /** Throws ApiException(409) if the file exists and [overwrite] is false. [onProgress] gets bytes sent so far. */
+    fun upload(path: String, length: Long, overwrite: Boolean, onProgress: (Long) -> Unit = {}, open: () -> InputStream) {
         val body = object : RequestBody() {
             override fun contentType() = "application/octet-stream".toMediaType()
             override fun contentLength() = length
             override fun writeTo(sink: BufferedSink) {
-                open().use { sink.writeAll(it.source()) }
+                open().use { input ->
+                    val buf = ByteArray(64 * 1024)
+                    var sent = 0L
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        sink.write(buf, 0, n)
+                        sent += n
+                        onProgress(sent)
+                    }
+                }
             }
         }
         val q = mutableMapOf("path" to path)

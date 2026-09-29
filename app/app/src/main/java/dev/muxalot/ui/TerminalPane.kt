@@ -16,6 +16,8 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.muxalot.Edition
+import dev.muxalot.data.ThemeStore
 import dev.muxalot.net.TerminalConnection
 import java.io.ByteArrayOutputStream
 
@@ -134,6 +136,7 @@ class TerminalPaneView(
             main.post {
                 ready = true
                 if (font != 14) js("tty.setFont($font)")
+                if (Edition.isPro) js("tty.setTheme(${ThemeStore(context).themeJson()})")
                 conn.resize(cols, rows)
                 conn.start()
                 flush()
