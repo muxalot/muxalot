@@ -201,6 +201,28 @@ No critical or high findings were identified. This review did not find an authen
 - **Go:** `gorilla/websocket` 1.5.3 and `creack/pty` 1.1.24 are current. `skip2/go-qrcode` (2020) is unmaintained but only renders QR codes in the `pair` command. Dependabot is enabled.
 - **Android:** `zxing-android-embedded` 4.3.0 (2021), Compose BOM 2024.10.01, OkHttp 4.12.0, kotlinx-serialization 1.7.3. These were not CVE-scanned in this review. Run `dependencyCheck` or OSV-Scanner over `app/`.
 
+## Desktop client (`desktop/`, Wails v3, Linux)
+
+Added after the review above; this section is the author's own design review plus checks run against the built binary, not an independent audit. Design: Go holds the device key, signs requests and owns the WebSocket; the webview renders xterm.js and can call only the methods in `Service` (`desktop/service.go`).
+
+| ID | Item | Status |
+|---|---|---|
+| W1 | Every exported `Service` method is callable by any script in the page, and so are Wails' own built-in runtime calls (open a URL in the browser, set/read the clipboard, native dialogs, window control, events) | Partly mitigated: no `Service` method signs, returns key material or takes a local path from JS, and `TestBoundSurface` fails if that list changes. The built-in runtime calls are **not** restricted: a script that got past the CSP could use them (for example write the clipboard without the OSC 52 prompt, which only guards terminal output). The runtime requests carry an object id, so an allowlist in the asset middleware may be possible; not implemented and not verified for every transport |
+| W2 | No framework permission layer, CSP or navigation control | Partly mitigated: strict CSP set by asset middleware (`TestCSPHeaderAndPolicy`); no page HTML is built from server text (`textContent` only, checked with a hostile file name). Wails v3 beta.26 has no navigation-policy hook, so a script that ran anyway could still navigate the webview. Residual, needs a script-injection bug first |
+| W3 | Key custody | Mitigated, not solved: OS keyring or a passphrase-wrapped file, no silent fallback (`keystore` tests). Either way the key is software-held; any process running as the same user can use the keyring while it is unlocked |
+| W4 | OSC 52 clipboard overwrite | Fixed for terminal output: a confirm dialog with length and preview; Deny leaves the clipboard untouched (checked in the running app). Does not protect against a script running in the page itself (see W1) |
+| W5 | Server-supplied file names become local paths | Mitigated: `SafeName` on the suggested name, the user picks the destination in a native dialog, created `O_EXCL` 0600 (unit tested). The native dialog flows themselves were not exercised automatically |
+| W6 | Hostile server: redirects, huge bodies/frames | Fixed: redirects not followed, 1 MB API cap, 4 MB WebSocket frame limit, https required (http only for loopback) |
+| W7 | Go cannot reliably zeroize the private key in memory | Accepted |
+| W8 | cgo and the system webview are native code | Accepted; WebKitGTK is patched by the distribution, not by this project |
+| W10 | DevTools and dev asset server in a release | Release builds use the `production` tag and set `DevToolsEnabled: false`; the dev server override is compiled out |
+| W11 | Wails v3 is beta | Pinned to `v3.0.0-beta.26` |
+| W12 | Toolchain and module vulnerabilities | `govulncheck` in CI; last run reported none affecting the code (one in a required module that the code does not call) |
+| D5 | Bracketed paste escape | Fixed: `Paste` in Go drops ESC and other control characters (`AAA<ESC>[201~BBB<^C>CCC` arrived as `AAA[201~BBBCCC`, checked in the running app). A multi-line confirmation appears only when the terminal is not in bracketed-paste mode; tmux normally turns that mode on, so it rarely shows up under tmux, as in any terminal |
+| X1 | **Terminal query replies.** The desktop client must wire `term.onData` to accept typing, so xterm.js answers terminal queries (device attributes, cursor position reports) from any output into the shell as input. The Android app avoids this by design (see "What is done well") | Accepted: the same as every desktop terminal emulator; the replies are short, fixed sequences and xterm.js does not implement title reports. Swallowing them would break programs that query the terminal |
+
+Not verified: macOS and Windows builds; the native upload and download dialogs; the OS keyring backend on a real desktop session (tests use a fake, the GUI check used passphrase mode); the go-keyring macOS backend possibly passing secrets on a command line (unconfirmed, verify before enabling keyring mode there); a distribution WebKitGTK older than 2.52.
+
 ## Code hygiene
 
 - `agent/server.go` `ctxKey` was unused (`staticcheck` U1000); now used by the M2 fix.

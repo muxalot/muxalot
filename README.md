@@ -95,6 +95,25 @@ Open `app/` in Android Studio (the Gradle wrapper isn't included; Studio creates
 - **Multi-server**: saved list, each server with its own Keystore key.
 - **Settings**: optional app lock (asks for the phone's screen lock on open, whenever the screen turns off, and after a minute in another app), and "Allow screenshots" (off by default in release builds: hides the app from screenshots, recording and recents).
 
+## Desktop app (Linux)
+
+A small [Wails](https://wails.io) app (Go + a system webview running the same xterm.js). Go holds the device key, signs requests and owns the network connection; the page only draws the terminal and calls a short, fixed list of methods. Sessions are tmux tabs, same as the phone app, plus a file browser (download/upload through native file dialogs).
+
+Build (needs Go, `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`; running it needs `libwebkit2gtk-4.1`):
+
+```
+make desktop            # dist/muxalot-desktop-linux-amd64
+make desktop-test       # vet + tests; the end-to-end test builds and runs the real agent (needs tmux)
+```
+
+On start it checks that a graphical session and a D-Bus session bus exist, and stops with a list of what is missing if not (`muxalot-desktop --check` runs only that check). If the window never finishes loading (usually a WebKitGTK/GPU problem) it exits after 20 s with a hint: try `WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1`. On Linux the app hides `.woff`/`.woff2` system fonts from its own process (they are never visible to other programs): Debian/Ubuntu's `fonts-opendyslexic` installs such files, fontconfig then picks them for every font request, and WebKitGTK's page thread spins at 100% CPU so the window never loads. A missing `libwebkit2gtk-4.1` or GTK3 can't be reported by the app itself: the system loader stops the program first and prints `error while loading shared libraries`, which names the package to install. The binary is dynamically linked, so build it on (or for) a system no newer than the one that runs it.
+
+Pair: run `muxalot-agent pair --url https://your.host` on the server, then enter the URL and code (or paste the `muxalot://pair` link into the URL field). Pick where the device key lives: the OS keyring (Secret Service / Keychain), or a passphrase-protected file (argon2id + XChaCha20-Poly1305) asked for at launch. There is no silent fallback from one to the other. The key is software-held, not hardware-bound; forget a lost machine with `muxalot-agent revoke <id>` on the server.
+
+Shortcuts: Ctrl+Shift+C copy selection, Ctrl+Shift+V paste, Ctrl+`+` / `-` / `0` zoom. The terminal asking to set your clipboard (OSC 52) always needs a click on Copy.
+
+Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update, installers, macOS/Windows builds (untested).
+
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 
 Binary frames are raw terminal bytes both ways. Text frames are JSON: client `{"t":"resize","cols","rows"}`, `{"t":"clip_set","text"}`, `{"t":"clip_get"}`, `{"t":"ping"}`; server `{"t":"clip","text"}`, `{"t":"pong"}`, `{"t":"exit"}`.
@@ -112,7 +131,7 @@ Muxalot is free and stays free. If it saves you time, you can support developmen
 
 muxalot is released under the [MIT License](LICENSE). Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Third-party components: Termux's terminal libraries were **not** used: `TerminalSession` is `final` and bound to a local process, and the Termux repo is GPLv3-only. xterm.js is MIT, OkHttp and zxing-android-embedded are Apache-2.0. Go deps: gorilla/websocket (BSD-2), creack/pty (MIT), go-qrcode (MIT).
+Third-party components: Termux's terminal libraries were **not** used: `TerminalSession` is `final` and bound to a local process, and the Termux repo is GPLv3-only. xterm.js is MIT, OkHttp and zxing-android-embedded are Apache-2.0. Go deps: gorilla/websocket (BSD-2), creack/pty (MIT), go-qrcode (MIT). Desktop app: Wails v3 (MIT), zalando/go-keyring (MIT), golang.org/x/crypto (BSD-3).
 
 ## Known limitations / next steps
 
