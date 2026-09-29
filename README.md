@@ -41,6 +41,25 @@ To build from source instead: `git clone https://github.com/muxalot/muxalot && c
 
 Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgrades, must not rewrite or strip the request path (the signature covers it), must send `X-Forwarded-For`, and must not buffer file streams or cap uploads too low. `muxalot-agent proxy` prints a snippet that does all of this.
 
+### Install options
+
+`install` (and `install.sh`, which passes its arguments on) accepts:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--user` | `muxalot-agent` | Unix user the agent and its terminals run as. Created if missing |
+| `--listen` | `127.0.0.1:8787` | Address the agent binds |
+| `--files-root` | that user's home | Directory tree exposed to file upload and download |
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install.sh | sudo sh -s -- --user alice --listen 192.168.1.10:8788
+```
+
+- **Which user:** the default dedicated user has an empty home and its own tmux, which is the most contained choice. To control your own machine (your tmux sessions, projects and shell), install with `--user <you>`. The agent still refuses to run as root.
+- **Proxy in Docker or on another host:** loopback is only reachable by a proxy on the same host and network namespace. If your proxy runs in a container or elsewhere, bind a LAN address with `--listen` and point the proxy at it. Restrict that port with a firewall to the proxy only. The agent trusts `X-Forwarded-For` only from loopback, so behind a non-loopback proxy the per-IP pairing rate limit is shared by all clients.
+- **Pairing:** run `pair` as the service user, for example `muxalot-agent pair --url https://your.host` when that is you, or `sudo -u muxalot-agent muxalot-agent pair …` for the default user. It must be the same user, because pairing state is stored in that user's config directory.
+- **Environment:** the service starts with systemd's minimal environment, not your login shell's, so new tmux sessions may lack your usual `PATH`. Existing tmux sessions are unaffected.
+
 The bundled `deploy/Caddyfile` reads these environment variables:
 
 | Variable | Meaning |
