@@ -1,4 +1,4 @@
-# muxalot
+<p align="center"><img src="assets/banner.svg" alt="Muxalot" width="600"></p>
 
 Open source under the [MIT License](LICENSE). Source and issues: <https://github.com/muxalot/muxalot>
 
