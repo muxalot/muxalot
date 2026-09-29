@@ -29,13 +29,15 @@ Android app (Compose)                         Linux server
 
 ## Server setup
 
-Requires Linux with `tmux` and a domain for TLS. Install the latest release (verifies its checksum, creates the `muxalot-agent` user, installs and starts the systemd unit):
+Requires Linux with `tmux` and a domain for TLS. Install the latest release (verifies its checksum, asks which Unix user to run as, creates that user if missing, installs and starts the systemd unit):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install.sh | sudo sh
 muxalot-agent proxy --type caddy --domain tty.example.com    # or nginx, apache: prints a reverse-proxy snippet
-sudo -u muxalot-agent muxalot-agent pair --url https://tty.example.com     # QR + one-time code
+sudo -u <that user> muxalot-agent pair --url https://tty.example.com     # QR + one-time code; just `muxalot-agent pair ...` if it's you
 ```
+
+The installer prompts for the user, defaulting to the account that ran `sudo` (or `muxalot-agent` when there is none). Root is refused. Pass `--user` to skip the prompt.
 
 To build from source instead: `git clone https://github.com/muxalot/muxalot && cd muxalot/agent && go build -o muxalot-agent . && sudo ./muxalot-agent install`.
 
@@ -55,9 +57,9 @@ Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgra
 curl -fsSL https://raw.githubusercontent.com/muxalot/muxalot/main/deploy/install.sh | sudo sh -s -- --user alice --listen 192.168.1.10:8788
 ```
 
-- **Which user:** the default dedicated user has an empty home and its own tmux, which is the most contained choice. To control your own machine (your tmux sessions, projects and shell), install with `--user <you>`. The agent still refuses to run as root.
+- **Which user:** the prompt (or `--user`) picks the account whose shell every terminal gets. Your own account gives you your tmux sessions, projects and shell, and is the default when you run `sudo`. A dedicated user such as `muxalot-agent` has an empty home and its own tmux, which is the most contained choice. Root is refused by both the installer and the agent. The prompt reads from the terminal, so it works under `curl | sudo sh`; with no terminal (CI, cloud-init) the default is used silently, so pass `--user` in scripts.
 - **Proxy in Docker or on another host:** loopback is only reachable by a proxy on the same host and network namespace. If your proxy runs in a container or elsewhere, bind a LAN address with `--listen` and point the proxy at it. Restrict that port with a firewall to the proxy only. The agent trusts `X-Forwarded-For` only from loopback, so behind a non-loopback proxy the per-IP pairing rate limit is shared by all clients.
-- **Pairing:** run `pair` as the service user, for example `muxalot-agent pair --url https://your.host` when that is you, or `sudo -u muxalot-agent muxalot-agent pair …` for the default user. It must be the same user, because pairing state is stored in that user's config directory.
+- **Pairing:** run `pair` as the user the agent runs as, for example `muxalot-agent pair --url https://your.host` when that is you, or `sudo -u <that user> muxalot-agent pair …` otherwise. It must be the same user, because pairing state is stored in that user's config directory.
 - **Environment:** tmux starts sessions as login shells, so your `~/.profile` and `~/.bashrc` apply and your `PATH` additions are there. If a tmux server for that user is already running, new sessions inherit its environment. Only when the service itself starts the tmux server do sessions lack desktop-session variables such as `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` (so `systemctl --user` fails) and `SSH_AUTH_SOCK`.
 
 The bundled `deploy/Caddyfile` reads these environment variables:
