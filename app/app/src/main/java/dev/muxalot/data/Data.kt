@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import dev.muxalot.BuildConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -37,6 +38,22 @@ class ServerStore(ctx: Context) {
         save(load().filter { it.id != id })
         DeviceKey.delete(id)
     }
+}
+
+/** Opt-in device-credential lock for the whole app; enforced in MainActivity. */
+class AppLock(ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("applock", Context.MODE_PRIVATE)
+    var enabled: Boolean
+        get() = prefs.getBoolean("enabled", false)
+        set(v) = prefs.edit().putBoolean("enabled", v).apply()
+}
+
+/** Screenshots and screen recording are blocked (FLAG_SECURE) unless allowed here; debug builds allow them so adb screencap works. */
+class AppSettings(ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    var allowScreenshots: Boolean
+        get() = prefs.getBoolean("allow_screenshots", BuildConfig.DEBUG)
+        set(v) = prefs.edit().putBoolean("allow_screenshots", v).apply()
 }
 
 /**

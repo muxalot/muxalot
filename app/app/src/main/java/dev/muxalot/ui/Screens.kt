@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -73,7 +74,7 @@ import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> Unit) {
+fun ServerListScreen(store: ServerStore, onSettings: () -> Unit, onOpen: (Server) -> Unit, onAdd: () -> Unit) {
     var servers by remember { mutableStateOf(store.load()) }
     var deleting by remember { mutableStateOf<Server?>(null) }
     Scaffold { pad ->
@@ -115,6 +116,7 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
                     }
                 }
             }
+            TextButton(onClick = onSettings, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Settings") }
             Text(
                 "Muxalot ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
@@ -136,6 +138,50 @@ fun ServerListScreen(store: ServerStore, onOpen: (Server) -> Unit, onAdd: () -> 
     }
 }
 
+@Composable
+fun SettingsScreen(
+    lockEnabled: Boolean,
+    onToggleLock: () -> Unit,
+    allowScreenshots: Boolean,
+    onAllowScreenshots: (Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    Scaffold { pad ->
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            ScreenHeader("Settings", onBack = onBack)
+            SettingRow("App lock", "Ask for the phone's screen lock when the app opens or returns after a minute away.", lockEnabled) { onToggleLock() }
+            SettingRow("Allow screenshots", "Off hides the app from screenshots, screen recording and the recent-apps preview.", allowScreenshots, onAllowScreenshots)
+        }
+    }
+}
+
+@Composable
+private fun SettingRow(title: String, note: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked, onChange)
+    }
+}
+
+@Composable
+fun LockedScreen(onUnlock: () -> Unit) {
+    Scaffold { pad ->
+        Column(
+            Modifier.padding(pad).fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(painterResource(R.drawable.logo_mark), null, Modifier.size(96.dp))
+            Text("Muxalot is locked", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(vertical = 16.dp))
+            MuxButton("Unlock", onUnlock)
+        }
+    }
+}
+
 // ---------------------------------------------------------------- pairing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -147,6 +193,7 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
     var name by remember { mutableStateOf(Build.MODEL ?: "phone") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var confirm by remember { mutableStateOf(false) }
     BackHandler(onBack = onCancel)
 
     val scan = rememberLauncherForActivityResult(ScanContract()) { res ->
@@ -158,6 +205,7 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
     }
 
     fun pair() {
+        confirm = false
         val cleanUrl = url.trim().trimEnd('/')
         if (!cleanUrl.startsWith("https://")) { error = "URL must start with https://"; return }
         busy = true
@@ -196,7 +244,8 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
                 OutlinedTextField(code, { code = it }, label = { Text("Pairing code") }, singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(name, { name = it }, label = { Text("This device's name") }, singleLine = true, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth())
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                MuxButton("Pair", { pair() }, enabled = !busy && url.isNotBlank() && code.isNotBlank())
+                // A link can pre-fill any server, so ask before pairing with one nobody typed in.
+                MuxButton("Pair", { if (initialUrl.isNotEmpty() && url == initialUrl) confirm = true else pair() }, enabled = !busy && url.isNotBlank() && code.isNotBlank())
                 if (busy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
                 Text(
                     "A key pair is generated on this phone. Only the public key is sent to the server; " +
@@ -206,6 +255,16 @@ fun PairScreen(store: ServerStore, initialUrl: String, initialCode: String, onDo
                 )
             }
         }
+    }
+    if (confirm) {
+        val host = Uri.parse(url.trim()).host ?: url
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text("Pair with $host?") },
+            text = { Text("This link filled in the server. Only continue if you started this pairing yourself.") },
+            confirmButton = { TextButton(onClick = { pair() }) { Text("Pair") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+        )
     }
 }
 
