@@ -47,7 +47,7 @@ Any TLS reverse proxy works (Caddy, nginx, Apache). It must pass WebSocket upgra
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--user` | `muxalot-agent` | Unix user the agent and its terminals run as. Created if missing |
+| `--user` | asked on the terminal; default is the user who ran `sudo`, else `muxalot-agent` | Unix user the agent and its terminals run as. Created if missing. `root` is rejected |
 | `--listen` | `127.0.0.1:8787` | Address the agent binds |
 | `--files-root` | that user's home | Directory tree exposed to file upload and download |
 

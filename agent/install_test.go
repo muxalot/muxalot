@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"testing"
 )
@@ -59,6 +60,14 @@ func TestUnitFile(t *testing.T) {
 	for _, w := range []string{"User=svc", "Group=svc", "ExecStart=/usr/local/bin/muxalot-agent serve --listen 127.0.0.1:8787 --files-root /home/svc"} {
 		if !strings.Contains(u, w) {
 			t.Errorf("unit missing %q:\n%s", w, u)
+		}
+	}
+}
+
+func TestAskUser(t *testing.T) {
+	for in, want := range map[string]string{"\n": "def", "alice\n": "alice", "root\nbob\n": "bob", "root\n": "def", "": "def"} {
+		if got := askUser("def", strings.NewReader(in), io.Discard); got != want {
+			t.Errorf("askUser(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

@@ -26,7 +26,7 @@ Usage:
   muxalot-agent devices [--data DIR]                                  list paired devices
   muxalot-agent add-key --name NAME (PUBKEY_B64 | @FILE) [--data DIR]  register a public key directly
   muxalot-agent revoke  ID [--data DIR]                               revoke a device
-  muxalot-agent install [--user muxalot-agent] [--listen ADDR] [--files-root DIR]   (root) install binary + systemd unit
+  muxalot-agent install [--user NAME] [--listen ADDR] [--files-root DIR]   (root) install binary + systemd unit
   muxalot-agent proxy   --type caddy|nginx|apache --domain HOST [--upstream ADDR]   print a reverse-proxy snippet
   muxalot-agent version                                               print the release version
 `)
@@ -53,7 +53,7 @@ func main() {
 	maxUp := fs.Int64("max-upload-mb", 2048, "max upload size in MiB")
 	name := fs.String("name", "", "device name (add-key)")
 	pubURL := fs.String("url", "", "public https URL of this server (for pair)")
-	svcUser := fs.String("user", "muxalot-agent", "service user (install)")
+	svcUser := fs.String("user", "", "service user (install; asked interactively if unset)")
 	proxyType := fs.String("type", "caddy", "proxy type: caddy, nginx or apache (proxy)")
 	domain := fs.String("domain", "", "public hostname (proxy)")
 	upstream := fs.String("upstream", "127.0.0.1:8787", "agent address the proxy forwards to (proxy)")
