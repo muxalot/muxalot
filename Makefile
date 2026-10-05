@@ -20,7 +20,7 @@ NEXT := $(shell echo $(LAST) | awk -F. -v b=$(BUMP) '{sub(/^v/,"",$$1); if (b=="
 
 GR = $(GRADLE) -q $(GRADLE_FLAGS) -p app -PversionName=$(VERSION) -PversionCode=$(CODE)
 
-.PHONY: help version test agent desktop desktop-assets desktop-test deb deb-smoke apk aab release release-agent release-apk release-desktop check-gradle check-clean check-tag
+.PHONY: help version test agent desktop desktop-assets desktop-test windows deb deb-smoke apk aab release release-agent release-apk release-desktop release-windows check-gradle check-clean check-tag
 .DEFAULT_GOAL := help
 
 help: ## this list
@@ -57,6 +57,14 @@ desktop: desktop-assets ## build the desktop client for this OS into dist/
 
 DEB = $(lastword $(sort $(wildcard $(DIST)/muxalot-desktop_*.deb)))
 IMAGE ?= ubuntu:24.04
+
+windows: desktop-assets ## build dist/muxalot-desktop_<version>_windows-amd64.zip (cross-builds from Linux, CGO_ENABLED=0; needs zip)
+	mkdir -p $(DIST)
+	cd desktop && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags production -trimpath -ldflags "-s -w -X main.version=$(VERSION) -H windowsgui" \
+	  -o ../$(DIST)/muxalot-desktop-windows-amd64.exe .
+	ln -f $(DIST)/muxalot-desktop-windows-amd64.exe $(DIST)/muxalot-desktop.exe
+	zip -j $(DIST)/muxalot-desktop_$(VERSION)_windows-amd64.zip $(DIST)/muxalot-desktop.exe desktop/packaging/windows-readme.txt
+	rm -f $(DIST)/muxalot-desktop.exe
 
 deb: desktop ## build dist/muxalot-desktop_<version>_amd64.deb on this machine (needs dpkg-dev fakeroot; release builds use Ubuntu 22.04, see release-desktop)
 	rm -f $(DIST)/muxalot-desktop_*.deb
@@ -113,3 +121,8 @@ release-desktop: check-tag desktop-test ## build the .deb in an ubuntu:22.04 con
 	docker run --rm -v "$(CURDIR)":/src ubuntu:22.04 bash /src/desktop/packaging/container-build.sh $(VERSION) $$(id -u):$$(id -g)
 	cd $(DIST) && sha256sum muxalot-desktop_*.deb > SHA256SUMS-desktop
 	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-desktop_*.deb $(DIST)/SHA256SUMS-desktop --clobber
+
+release-windows: check-tag windows ## cross-build and upload the Windows zip (local build: no attestation; FORCE=1 replaces an existing one)
+	@if gh release view $(LAST) --json assets -q '.assets[].name' | grep -q 'windows-amd64.zip$$' && [ -z "$(FORCE)" ]; then echo "$(LAST) already has a Windows zip (CI attests it, a local build cannot); FORCE=1 replaces it with this unattested build"; exit 1; fi
+	rm -f $(DIST)/muxalot-desktop_*_windows-*.zip $(DIST)/muxalot-desktop-windows-amd64.exe
+	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-desktop_$(VERSION)_windows-amd64.zip --clobber

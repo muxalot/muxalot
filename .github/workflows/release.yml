@@ -80,8 +80,37 @@ jobs:
       - name: Install and launch in ${{ matrix.image }}
         run: docker run --rm -v "$PWD/desktop/packaging/smoke.sh:/smoke.sh:ro" -v "$PWD/deb:/pkg:ro" "${{ matrix.image }}" bash /smoke.sh
 
+  # Windows: cross-compiled from any host (Wails needs no CGO there), but built
+  # and smoked on a Windows runner so the app is launched where it will run.
+  windows-build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: desktop/go.mod
+      - name: Build and smoke
+        shell: pwsh
+        run: powershell -File desktop/packaging/build-windows.ps1
+      - name: Checksum
+        id: zip
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash -Algorithm SHA256 "dist\muxalot-desktop_*_windows-amd64.zip").Hash
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "sha256=$($h.ToLower())"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-zip
+          path: dist/muxalot-desktop_*_windows-amd64.zip
+          if-no-files-found: error
+
+  # The Windows smoke runs inside windows-build; see desktop/packaging/build-windows.ps1.
   desktop-publish:
-    needs: [agent, desktop-build, desktop-smoke]
+    needs: [agent, desktop-build, desktop-smoke, windows-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -92,12 +121,20 @@ jobs:
         with:
           name: desktop-deb
           path: deb
-      - name: Verify the artifact is the one that was tested
-        run: echo "${{ needs.desktop-build.outputs.sha256 }}  $(ls deb/*.deb)" | sha256sum -c -
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: windows-zip
+          path: win
+      - name: Verify the artifacts are the ones that were tested
+        run: |
+          echo "${{ needs.desktop-build.outputs.sha256 }}  $(ls deb/*.deb)" | sha256sum -c -
+          echo "${{ needs.windows-build.outputs.sha256 }}  $(ls win/*.zip)" | sha256sum -c -
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
-          subject-path: deb/muxalot-desktop_*.deb
+          subject-path: |
+            deb/muxalot-desktop_*.deb
+            win/muxalot-desktop_*_windows-amd64.zip
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,3 +143,6 @@ jobs:
           cd deb
           sha256sum muxalot-desktop_*.deb > SHA256SUMS-desktop
           gh release upload "$GITHUB_REF_NAME" muxalot-desktop_*.deb SHA256SUMS-desktop --clobber
+          cd ../win
+          sha256sum muxalot-desktop_*_windows-amd64.zip > SHA256SUMS-windows
+          gh release upload "$GITHUB_REF_NAME" muxalot-desktop_*_windows-amd64.zip SHA256SUMS-windows --clobber

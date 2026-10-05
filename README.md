@@ -2,7 +2,7 @@
 
 Open source under the [MIT License](LICENSE). Website: <https://muxalot.com>. Source and issues: <https://github.com/muxalot/muxalot>. Play Store testers: [join the closed test](https://play.google.com/apps/testing/dev.muxalot.pro) / [Play listing](https://play.google.com/store/apps/details?id=dev.muxalot.pro)
 
-Remote terminal for Android and Linux desktops, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session. Get the Linux desktop app as a `.deb` from the [latest release](https://github.com/muxalot/muxalot/releases/latest) ([install steps](#install-ubuntu-and-debian-amd64)).
+Remote terminal for Android and Linux/Windows desktops, streamed from a Linux server. Sessions are tmux sessions, so they survive disconnects; each tab is one session. Get the desktop app from the [latest release](https://github.com/muxalot/muxalot/releases/latest): a `.deb` for Linux ([install steps](#install-ubuntu-and-debian-amd64)) and a zip for Windows ([install steps](#windows-zip-amd64)).
 
 ```
 Android app (Compose)                         Linux server
@@ -16,7 +16,7 @@ Linux desktop app (Wails, xterm.js)      <->  (same agent, same signed requests)
 |---|---|
 | `agent/` | Built and tested (`go test ./...`): pairing, signed-request auth, replay/forgery rejection, rate limiting, path-traversal/symlink checks, upload limits, tmux persistence across a dropped connection, clipboard. |
 | `app/` | Working Android app: terminal, tabs, clipboard, files, multi-server. No automated tests yet. |
-| `desktop/` | Working Linux desktop app (Go + Wails): terminal, tabs, files, multi-server. Released as a `.deb` for Ubuntu 22.04/24.04/26.04 and Debian 12/13 (amd64). Tests include an end-to-end run against the real agent. |
+| `desktop/` | Working desktop app (Go + Wails, Linux and Windows): terminal, tabs, files, multi-server. Released as a `.deb` for Ubuntu 22.04/24.04/26.04 and Debian 12/13 (amd64), and a portable zip for Windows 10 21H2+/11 (amd64). Tests include an end-to-end run against the real agent; the Windows build is cross-compiled and launched by the CI. |
 
 ## Auth: public/private keys
 
@@ -120,7 +120,14 @@ Start it from your app menu (**muxalot**) or run `muxalot-desktop`. To upgrade, 
 
 - **Trust:** there is no apt repository and no package signing key, so the attestation in step 2 is what ties the file to this repo's release workflow. `SHA256SUMS-desktop` in the release only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails step 2.
 - **Key storage:** the "OS keyring" option needs a Secret Service provider such as GNOME Keyring or KWallet (the package recommends `gnome-keyring`). Without one, choose the passphrase-protected file when pairing.
-- **Other systems:** other distros, arm64, macOS and Windows have no package yet. Build from source below.
+- **Other systems:** other distros, arm64 and macOS have no package yet. Windows ships as a zip (below). Build from source below.
+
+### Windows (zip, amd64)
+
+Supported: Windows 10 21H2 or newer, and Windows 11 — the app renders with the preinstalled WebView2 runtime (older Windows 10 needs it once, the [download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)). Download and unzip `muxalot-desktop_*_windows-amd64.zip` from the [latest release](https://github.com/muxalot/muxalot/releases/latest); no installer, no admin rights; the zip's readme has the same notes. The machine keeps no package state, so "upgrade" is: unzip the new release over the old folder.
+
+- **Trust:** the build is not code-signed, so SmartScreen may show "unknown publisher" on first run: "More info" → "Run anyway". The attestation (same `gh attestation verify <file> --repo muxalot/muxalot` on the zip) is what ties it to this repo's workflow; "Run anyway" is the only way past SmartScreen for an unsigned build.
+- **Key storage:** the OS keyring option uses Windows Credential Manager; nothing is stored on the server. `muxalot-desktop --check` verifies the WebView2 runtime is present without opening the window.
 
 ### Build from source
 
@@ -144,7 +151,7 @@ Pair: run `muxalot-agent pair --url https://your.host` on the server, then enter
 
 Shortcuts: Ctrl+Shift+C copy selection, Ctrl+Shift+V paste, Ctrl+`+` / `-` / `0` zoom. The terminal asking to set your clipboard (OSC 52) always needs a click on Copy.
 
-Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb`), rpm/AppImage packages, macOS/Windows builds (untested).
+Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb` or re-zip), rpm/AppImage packages, an NSIS installer for Windows (the portable zip ships today), macOS builds (untested).
 
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 

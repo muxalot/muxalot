@@ -49,7 +49,7 @@ func main() {
 		if len(problems) > 0 {
 			os.Exit(1)
 		}
-		fmt.Println("ok: graphical session and D-Bus session bus found")
+		fmt.Println("ok: requirements met")
 		return
 	}
 	if len(problems) > 0 {
