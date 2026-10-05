@@ -30,15 +30,24 @@
   </form>
 </main>
 
+<section id="list" hidden aria-label="Servers">
+  <div class="row">
+    <h1>Servers</h1>
+    <span class="spacer"></span>
+    <button class="add-server">Add server</button>
+  </div>
+  <div id="list-cards"></div>
+</section>
+
 <div id="app" hidden>
   <header>
+    <button id="servers" title="Server list">Servers</button>
     <select id="server" aria-label="Server"></select>
     <nav id="tabs" aria-label="Sessions"></nav>
     <button id="new-tab" title="New session" aria-label="New session">+</button>
     <span class="spacer"></span>
     <button id="files-btn">Files</button>
     <button id="add-server">Add server</button>
-    <button id="forget">Forget</button>
   </header>
   <div id="terms"></div>
 </div>

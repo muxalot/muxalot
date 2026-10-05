@@ -319,6 +319,7 @@ async function loadServer(id) {
 
 function showPair() {
   $('app').hidden = true;
+  $('list').hidden = true;
   $('pair').hidden = false;
   $('p-cancel').hidden = servers.length === 0;
   $('p-url').focus();
@@ -326,12 +327,62 @@ function showPair() {
 
 function showApp() {
   $('pair').hidden = true;
+  $('list').hidden = true;
   $('app').hidden = false;
 }
 
+// Landing view. Open tabs stay alive (hidden inside #terms); reopening a card
+// runs the normal loadServer flow, which re-attaches to them.
+function showList() {
+  $('pair').hidden = true;
+  $('app').hidden = true;
+  const box = $('list-cards');
+  box.replaceChildren();
+  for (const s of servers) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.tabIndex = 0;
+    card.role = 'button';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const b = document.createElement('b');
+    b.textContent = s.name;
+    const u = document.createElement('span');
+    u.textContent = s.url;
+    meta.append(b, u);
+    card.append(meta);
+    const open = () => { showApp(); loadServer(s.id); };
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target === card) open(); });
+    if (s.id === cur) card.classList.add('cur');
+    const forgetB = document.createElement('button');
+    forgetB.textContent = 'Forget';
+    forgetB.addEventListener('click', (e) => { e.stopPropagation(); forgetServer(s); });
+    card.append(forgetB);
+    box.append(card);
+  }
+  $('list').hidden = false;
+}
+
+async function forgetServer(s) {
+  const r = await ask({
+    title: `Forget ${s.name}?`,
+    body: 'This deletes this device\'s key. To use the server again you must pair again. Revoke the device on the server with `muxalot-agent revoke`.',
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Forget', value: true, primary: true }],
+  });
+  if (!r.value) return;
+  try { await call('Forget', s.id); } catch (e) { return fail(e); }
+  for (const t of [...tabs.values()]) if (t.server === s.id) dispose(t);
+  if (cur === s.id) cur = null;
+  servers = await call('Servers');
+  fillServers();
+  if (servers.length) showList(); else showPair();
+}
+
 $('server').addEventListener('change', (e) => loadServer(e.target.value));
-$('add-server').addEventListener('click', showPair);
-$('p-cancel').addEventListener('click', showApp);
+for (const el of document.querySelectorAll('.add-server')) el.addEventListener('click', showPair);
+$('servers').addEventListener('click', showList);
+$('p-cancel').addEventListener('click', () => (servers.length ? showList() : showPair()));
 $('new-tab').addEventListener('click', async () => {
   for (;;) {
     const r = await ask({
@@ -345,21 +396,6 @@ $('new-tab').addEventListener('click', async () => {
     if (NAME_RE.test(r.text)) return openTab(r.text);
     fail('Invalid session name');
   }
-});
-$('forget').addEventListener('click', async () => {
-  const s = servers.find((x) => x.id === cur);
-  if (!s) return;
-  const r = await ask({
-    title: `Forget ${s.name}?`,
-    body: 'This deletes this device\'s key. To use the server again you must pair again. Revoke the device on the server with `muxalot-agent revoke`.',
-    buttons: [{ label: 'Cancel', value: null }, { label: 'Forget', value: true, primary: true }],
-  });
-  if (!r.value) return;
-  try { await call('Forget', s.id); } catch (e) { return fail(e); }
-  for (const t of [...tabs.values()]) if (t.server === s.id) dispose(t);
-  servers = await call('Servers');
-  cur = null;
-  if (servers.length) { fillServers(); showApp(); loadServer(servers[0].id); } else showPair();
 });
 
 // ---------------------------------------------------------------- pairing
@@ -440,10 +476,9 @@ Events.On('xfer:progress', (ev) => {
 (async () => {
   try {
     servers = await call('Servers');
-    if (!servers.length) return showPair();
     fillServers();
-    showApp();
-    await loadServer(servers[0].id);
+    if (!servers.length) return showPair();
+    showList(); // land on the chooser; nothing loads until a server is picked
   } catch (e) {
     fail(e);
   }
