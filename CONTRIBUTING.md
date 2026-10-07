@@ -7,6 +7,7 @@ Issues and pull requests are welcome at <https://github.com/muxalot/muxalot>. By
 - `agent/`: Go server (PTY, tmux, signed-request auth, files)
 - `app/`: Android app (Kotlin, Jetpack Compose, xterm.js in a WebView)
 - `deploy/`: systemd unit and Caddyfile
+- `flake.nix`: NixOS package for the desktop client (builds `desktop/` with the same tags as `make desktop`)
 
 ## Agent (Go)
 

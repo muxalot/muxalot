@@ -120,7 +120,7 @@ Start it from your app menu (**muxalot**) or run `muxalot-desktop`. To upgrade, 
 
 - **Trust:** there is no apt repository and no package signing key, so the attestation in step 2 is what ties the file to this repo's release workflow. `SHA256SUMS-desktop` in the release only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails step 2.
 - **Key storage:** the "OS keyring" option needs a Secret Service provider such as GNOME Keyring or KWallet (the package recommends `gnome-keyring`). Without one, choose the passphrase-protected file when pairing.
-- **Other systems:** other distros, arm64 and macOS have no package yet. Windows ships as a zip (below). Build from source below.
+- **Other systems:** other distros, arm64 and macOS have no package yet — NixOS gets the flake described under "Build from source". Windows ships as a zip (below). Build from source below.
 
 ### Windows (zip, amd64)
 
@@ -141,6 +141,15 @@ make deb                # dist/muxalot-desktop_<version>_amd64.deb for this mach
 
 A `.deb` you build with `make deb` takes its dependency names from the machine that built it, so one built on Ubuntu 24.04 will not install on Ubuntu 22.04 or Debian 12. Release packages are built on Ubuntu 22.04 for that reason.
 
+On NixOS, build and run the desktop client declaratively instead (the released `.deb` does not work there):
+
+```
+nix run github:muxalot/muxalot#muxalot-desktop   # install/run a tracked commit
+nix develop                                      # shell with Go, GTK3, WebKitGTK for `make desktop-test`
+```
+
+The flake builds the same binary with the same tags as `make desktop`; add `github:muxalot/muxalot#muxalot-desktop` to `environment.systemPackages` to install it.
+
 ### If it does not start
 
 On start it checks that a graphical session and a D-Bus session bus exist, and stops with a list of what is missing if not (`muxalot-desktop --check` runs only that check). If the window never finishes loading (usually a WebKitGTK/GPU problem) it exits after 20 s with a hint: try `WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1`. On Linux the app hides `.woff`/`.woff2` system fonts from its own process (they are never visible to other programs): Debian/Ubuntu's `fonts-opendyslexic` installs such files, fontconfig then picks them for every font request, and WebKitGTK's page thread spins at 100% CPU so the window never loads. A missing `libwebkit2gtk-4.1` or GTK3 can't be reported by the app itself: the system loader stops the program first and prints `error while loading shared libraries`, which names the package to install. The binary is dynamically linked, so build it on (or for) a system no newer than the one that runs it.
@@ -151,7 +160,7 @@ Pair: run `muxalot-agent pair --url https://your.host` on the server, then enter
 
 Shortcuts: Ctrl+Shift+C copy selection, Ctrl+Shift+V paste, Ctrl+`+` / `-` / `0` zoom. The terminal asking to set your clipboard (OSC 52) always needs a click on Copy.
 
-Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb` or re-zip), rpm/AppImage packages, an NSIS installer for Windows (the portable zip ships today), macOS builds (untested).
+Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb` or re-zip), rpm/AppImage packages (a Nix flake ships above), an NSIS installer for Windows (the portable zip ships today), macOS builds (untested).
 
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 

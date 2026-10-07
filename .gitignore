@@ -14,3 +14,6 @@ keystore.properties
 CLAUDE.md
 IMPLEMENTATION_PLAN.md
 IMPLEMENTATION_PLAN.md
+
+# nix flake artifacts
+result*
