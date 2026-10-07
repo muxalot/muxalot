@@ -109,6 +109,8 @@ jobs:
           path: appimg
       - name: Verify the artifact is the one that was built
         run: echo "${{ needs.desktop-build.outputs.sha256appimage }}  $(ls appimg/*.AppImage)" | sha256sum -c -
+      - name: Restore the executable bit (download-artifact does not keep it)
+        run: chmod +x appimg/*.AppImage
       - name: Launch with no GTK or WebKitGTK present in ${{ matrix.image }}
         run: docker run --rm -v "$PWD/desktop/packaging/smoke-appimage.sh:/smoke.sh:ro" -v "$PWD/appimg:/pkg:ro" "${{ matrix.image }}" bash /smoke.sh
 
