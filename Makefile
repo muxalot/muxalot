@@ -20,7 +20,7 @@ NEXT := $(shell echo $(LAST) | awk -F. -v b=$(BUMP) '{sub(/^v/,"",$$1); if (b=="
 
 GR = $(GRADLE) -q $(GRADLE_FLAGS) -p app -PversionName=$(VERSION) -PversionCode=$(CODE)
 
-.PHONY: help version test agent desktop desktop-assets desktop-test windows deb deb-smoke apk aab release release-agent release-apk release-desktop release-windows check-gradle check-clean check-tag
+.PHONY: help version test agent desktop desktop-assets desktop-test windows deb deb-smoke appimage appimage-smoke apk aab release release-agent release-apk release-desktop release-windows check-gradle check-clean check-tag
 .DEFAULT_GOAL := help
 
 help: ## this list
@@ -56,6 +56,7 @@ desktop: desktop-assets ## build the desktop client for this OS into dist/
 	  -o ../$(DIST)/muxalot-desktop-$$(go env GOOS)-$$(go env GOARCH) .
 
 DEB = $(lastword $(sort $(wildcard $(DIST)/muxalot-desktop_*.deb)))
+APPIMAGE = $(lastword $(sort $(wildcard $(DIST)/muxalot-desktop_*.AppImage)))
 IMAGE ?= ubuntu:24.04
 
 windows: desktop-assets ## build dist/muxalot-desktop_<version>_windows-amd64.zip (cross-builds from Linux, CGO_ENABLED=0; needs zip)
@@ -70,9 +71,17 @@ deb: desktop ## build dist/muxalot-desktop_<version>_amd64.deb on this machine (
 	rm -f $(DIST)/muxalot-desktop_*.deb
 	desktop/packaging/build-deb.sh $(VERSION) $(DIST)/muxalot-desktop-linux-amd64 $(DIST)
 
+appimage: desktop ## build dist/muxalot-desktop_<version>_amd64.AppImage on this machine (needs patchelf and curl for linuxdeploy; release builds use Ubuntu 22.04, see release-desktop)
+	rm -f $(DIST)/muxalot-desktop_*.AppImage
+	desktop/packaging/build-appimage.sh $(VERSION) $(DIST)/muxalot-desktop-linux-amd64 $(DIST)
+
 deb-smoke: ## install the .deb in a container and launch it (IMAGE=debian:12; default ubuntu:24.04; needs docker)
 	@test -n "$(DEB)" || { echo "no .deb in $(DIST): run make deb first"; exit 1; }
 	docker run --rm --network=host -v "$(CURDIR)/desktop/packaging/smoke.sh:/smoke.sh:ro" -v "$(CURDIR)/$(DEB):/pkg/pkg.deb:ro" $(IMAGE) bash /smoke.sh
+
+appimage-smoke: ## launch the AppImage in a container with no GTK/WebKit runtime deps at all (IMAGE=debian:12; default ubuntu:24.04; needs docker)
+	@test -n "$(APPIMAGE)" || { echo "no .AppImage in $(DIST): run make appimage first"; exit 1; }
+	docker run --rm -v "$(CURDIR)/desktop/packaging/smoke-appimage.sh:/smoke.sh:ro" -v "$(CURDIR)/$(APPIMAGE):/pkg/muxalot-desktop_$(VERSION)_amd64.AppImage:ro" $(IMAGE) bash /smoke.sh
 
 check-gradle:
 	@test -n "$(GRADLE)" || { echo "Gradle 8.10+ not found; run make with GRADLE=/path/to/gradle"; exit 1; }
@@ -94,7 +103,7 @@ aab: check-gradle ## signed pro bundle for Play into dist/ (needs the play.* key
 check-clean:
 	@git diff --quiet && git diff --cached --quiet && [ -z "$$(git ls-files --others --exclude-standard)" ] || { echo "working tree not clean"; exit 1; }
 
-release: check-gradle check-clean test ## bump version, tag and push; CI then publishes the agent and the desktop .deb
+release: check-gradle check-clean test ## bump version, tag and push; CI then publishes the agent, the desktop .deb and the AppImage
 	@[ "$$(git rev-parse --abbrev-ref HEAD)" = main ] || { echo "not on main"; exit 1; }
 	@git fetch -q origin main && [ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ] || { echo "main differs from origin/main; push or pull first"; exit 1; }
 	@! git rev-parse -q --verify refs/tags/$(NEXT) >/dev/null || { echo "$(NEXT) already exists"; exit 1; }
@@ -114,13 +123,13 @@ release-agent: check-tag test agent ## rebuild the agent and upload it to the la
 release-apk: check-tag apk ## build the signed APK and upload it to the latest release
 	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-$(VERSION).apk --clobber
 
-release-desktop: check-tag desktop-test ## build the .deb in an ubuntu:22.04 container and upload it (local build: no attestation; FORCE=1 replaces an existing .deb)
+release-desktop: check-tag desktop-test ## build the .deb and AppImage in an ubuntu:22.04 container and upload them (local build: no attestation; FORCE=1 replaces existing assets)
 	@command -v docker >/dev/null || { echo "docker is required: the .deb must be built on Ubuntu 22.04 for its glibc floor"; exit 1; }
-	@if gh release view $(LAST) --json assets -q '.assets[].name' | grep -q '\.deb$$' && [ -z "$(FORCE)" ]; then echo "$(LAST) already has a .deb (CI attests it, a local build cannot); FORCE=1 replaces it with this unattested build"; exit 1; fi
-	rm -f $(DIST)/muxalot-desktop_*.deb
+	@if gh release view $(LAST) --json assets -q '.assets[].name' | grep -q -e '\.deb$$' -e '\.AppImage$$' && [ -z "$(FORCE)" ]; then echo "$(LAST) already has a .deb/AppImage (CI attests them, a local build cannot); FORCE=1 replaces it with this unattested build"; exit 1; fi
+	rm -f $(DIST)/muxalot-desktop_*.deb $(DIST)/muxalot-desktop_*.AppImage
 	docker run --rm -v "$(CURDIR)":/src ubuntu:22.04 bash /src/desktop/packaging/container-build.sh $(VERSION) $$(id -u):$$(id -g)
-	cd $(DIST) && sha256sum muxalot-desktop_*.deb > SHA256SUMS-desktop
-	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-desktop_*.deb $(DIST)/SHA256SUMS-desktop --clobber
+	cd $(DIST) && sha256sum muxalot-desktop_*.deb > SHA256SUMS-desktop && sha256sum muxalot-desktop_*.AppImage > SHA256SUMS-appimage
+	$(RUN) gh release upload $(LAST) $(DIST)/muxalot-desktop_*.deb $(DIST)/muxalot-desktop_*.AppImage $(DIST)/SHA256SUMS-desktop $(DIST)/SHA256SUMS-appimage --clobber
 
 release-windows: check-tag windows ## cross-build and upload the Windows zip (local build: no attestation; FORCE=1 replaces an existing one)
 	@if gh release view $(LAST) --json assets -q '.assets[].name' | grep -q 'windows-amd64.zip$$' && [ -z "$(FORCE)" ]; then echo "$(LAST) already has a Windows zip (CI attests it, a local build cannot); FORCE=1 replaces it with this unattested build"; exit 1; fi

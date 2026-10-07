@@ -120,7 +120,22 @@ Start it from your app menu (**muxalot**) or run `muxalot-desktop`. To upgrade, 
 
 - **Trust:** there is no apt repository and no package signing key, so the attestation in step 2 is what ties the file to this repo's release workflow. `SHA256SUMS-desktop` in the release only catches corruption. A `.deb` uploaded by hand with `make release-desktop` is not attested and fails step 2.
 - **Key storage:** the "OS keyring" option needs a Secret Service provider such as GNOME Keyring or KWallet (the package recommends `gnome-keyring`). Without one, choose the passphrase-protected file when pairing.
-- **Other systems:** other distros, arm64 and macOS have no package yet — NixOS gets the flake described under "Build from source". Windows ships as a zip (below). Build from source below.
+- **Other systems:** other distros: use the AppImage above; arm64 and macOS have no package yet. Windows ships as a zip (below). NixOS additionally gets a flake under "Build from source". Build from source below.
+
+### AppImage (amd64)
+
+One file, no system GTK or WebKitGTK: the AppImage carries both (built with the same tags as `.deb`), plus its WebKit helper processes. It assumes the host has a desktop's GL/wayland/X11 runtime and a fontconfig with fonts, like the `.deb` does.
+
+```sh
+gh release download --repo muxalot/muxalot --pattern 'muxalot-desktop_*_amd64.AppImage'
+gh attestation verify muxalot-desktop_*_amd64.AppImage --repo muxalot/muxalot
+chmod +x muxalot-desktop_*_amd64.AppImage
+./muxalot-desktop_*_amd64.AppImage
+```
+
+Needs `libfuse2` on the host; without it, run `./muxalot-desktop_*_amd64.AppImage --appimage-extract-and-run` instead (both paths are smoke-tested in CI). Key storage works as on the `.deb`: the OS keyring needs a Secret Service provider (GNOME Keyring or KWallet), otherwise choose the passphrase-protected file. There is no desktop-menu entry — start it as above, or copy the AppImage and register it with the app launcher of your desktop.
+
+- **Trust:** the attestation (same `gh attestation verify` step, AppImage is a build-provenance subject like the `.deb`/zip).
 
 ### Windows (zip, amd64)
 
@@ -160,7 +175,7 @@ Pair: run `muxalot-agent pair --url https://your.host` on the server, then enter
 
 Shortcuts: Ctrl+Shift+C copy selection, Ctrl+Shift+V paste, Ctrl+`+` / `-` / `0` zoom. The terminal asking to set your clipboard (OSC 52) always needs a click on Copy.
 
-Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update (install the newer `.deb` or re-zip), rpm/AppImage packages (a Nix flake ships above), an NSIS installer for Windows (the portable zip ships today), macOS builds (untested).
+Not in the desktop app yet: QR pairing, color themes, custom key shortcuts, tmux clipboard sync, auto-update, rpm packages (AppImage and the NixOS flake ship today), an NSIS installer for Windows (the portable zip ships today), macOS builds (untested).
 
 ## Wire protocol (WebSocket `/ws?session=NAME&cols=N&rows=N`)
 

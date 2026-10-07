@@ -38,6 +38,7 @@ jobs:
       contents: read
     outputs:
       sha256: ${{ steps.deb.outputs.sha256 }}
+      sha256appimage: ${{ steps.appimage.outputs.sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -46,18 +47,26 @@ jobs:
         with:
           go-version-file: desktop/go.mod
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y tmux libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev fakeroot
+        run: sudo apt-get update && sudo apt-get install -y tmux libgtk-3-dev libwebkit2gtk-4.1-dev dpkg-dev fakeroot patchelf
       - name: Test
         run: make desktop-test
       - name: Build package
-        run: make deb
+        run: make deb appimage
       - name: Checksum
         id: deb
         run: echo "sha256=$(sha256sum dist/muxalot-desktop_*.deb | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Checksum (AppImage)
+        id: appimage
+        run: echo "sha256=$(sha256sum dist/muxalot-desktop_*.AppImage | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desktop-deb
           path: dist/muxalot-desktop_*.deb
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-appimage
+          path: dist/muxalot-desktop_*.AppImage
           if-no-files-found: error
 
   # Install the package and launch it on every supported distro; the supported list in the README is this matrix.
@@ -80,6 +89,28 @@ jobs:
         run: echo "${{ needs.desktop-build.outputs.sha256 }}  $(ls deb/*.deb)" | sha256sum -c -
       - name: Install and launch in ${{ matrix.image }}
         run: docker run --rm -v "$PWD/desktop/packaging/smoke.sh:/smoke.sh:ro" -v "$PWD/deb:/pkg:ro" "${{ matrix.image }}" bash /smoke.sh
+
+  # The AppImage asserts its own point in the same matrix: the container has NO
+  # GTK/WebKitGTK and the app must still launch (only host fontconfig is assumed).
+  appimage-smoke:
+    needs: desktop-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:22.04', 'ubuntu:24.04', 'ubuntu:26.04', 'debian:12', 'debian:13']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-appimage
+          path: appimg
+      - name: Verify the artifact is the one that was built
+        run: echo "${{ needs.desktop-build.outputs.sha256appimage }}  $(ls appimg/*.AppImage)" | sha256sum -c -
+      - name: Launch with no GTK or WebKitGTK present in ${{ matrix.image }}
+        run: docker run --rm -v "$PWD/desktop/packaging/smoke-appimage.sh:/smoke.sh:ro" -v "$PWD/appimg:/pkg:ro" "${{ matrix.image }}" bash /smoke.sh
 
   # Windows: cross-compiled from any host (Wails needs no CGO there), but built
   # and smoked on a Windows runner so the app is launched where it will run.
@@ -113,7 +144,7 @@ jobs:
 
   # The Windows smoke runs inside windows-build; see desktop/packaging/build-windows.ps1.
   desktop-publish:
-    needs: [agent, desktop-build, desktop-smoke, windows-build]
+    needs: [agent, desktop-build, desktop-smoke, appimage-smoke, windows-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,17 +157,23 @@ jobs:
           path: deb
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
+          name: desktop-appimage
+          path: appimg
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
           name: windows-zip
           path: win
       - name: Verify the artifacts are the ones that were tested
         run: |
           echo "${{ needs.desktop-build.outputs.sha256 }}  $(ls deb/*.deb)" | sha256sum -c -
+          echo "${{ needs.desktop-build.outputs.sha256appimage }}  $(ls appimg/*.AppImage)" | sha256sum -c -
           echo "${{ needs.windows-build.outputs.sha256 }}  $(ls win/*.zip)" | sha256sum -c -
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: |
             deb/muxalot-desktop_*.deb
+            appimg/muxalot-desktop_*.AppImage
             win/muxalot-desktop_*_windows-amd64.zip
       - name: Publish
         env:
@@ -146,6 +183,9 @@ jobs:
           cd deb
           sha256sum muxalot-desktop_*.deb > SHA256SUMS-desktop
           gh release upload "$GITHUB_REF_NAME" muxalot-desktop_*.deb SHA256SUMS-desktop --clobber
+          cd ../appimg
+          sha256sum muxalot-desktop_*.AppImage > SHA256SUMS-appimage
+          gh release upload "$GITHUB_REF_NAME" muxalot-desktop_*.AppImage SHA256SUMS-appimage --clobber
           cd ../win
           sha256sum muxalot-desktop_*_windows-amd64.zip > SHA256SUMS-windows
           gh release upload "$GITHUB_REF_NAME" muxalot-desktop_*_windows-amd64.zip SHA256SUMS-windows --clobber
