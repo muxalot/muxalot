@@ -19,7 +19,10 @@ const (
 func unitFile(user, listen, filesRoot string) string {
 	return fmt.Sprintf(`[Unit]
 Description=muxalot-agent remote terminal agent
-After=network.target
+# Wait for real connectivity: the agent binds a specific IP, which may only
+# exist once DHCP has run. plain network.target can fire earlier.
+Wants=network-online.target
+After=network-online.target network.target
 
 [Service]
 # Unprivileged user only; the agent refuses to run as root.

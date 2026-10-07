@@ -57,7 +57,7 @@ func TestMissingDeps(t *testing.T) {
 
 func TestUnitFile(t *testing.T) {
 	u := unitFile("svc", "127.0.0.1:8787", "/home/svc")
-	for _, w := range []string{"User=svc", "Group=svc", "ExecStart=/usr/local/bin/muxalot-agent serve --listen 127.0.0.1:8787 --files-root /home/svc"} {
+	for _, w := range []string{"User=svc", "Group=svc", "Wants=network-online.target", "After=network-online.target network.target", "ExecStart=/usr/local/bin/muxalot-agent serve --listen 127.0.0.1:8787 --files-root /home/svc"} {
 		if !strings.Contains(u, w) {
 			t.Errorf("unit missing %q:\n%s", w, u)
 		}
