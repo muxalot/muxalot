@@ -114,6 +114,12 @@ class Api(private val server: Server) {
         client.newCall(request("DELETE", url("sessions", name))).execute().use { check(it) }
     }
 
+    /** Renames the tmux session; the agent answers 409 when the new name is taken. */
+    fun rename(from: String, to: String) {
+        val body = """{"to":"$to"}""".toRequestBody("application/json".toMediaType())
+        client.newCall(request("POST", url("sessions", from, "rename"), body)).execute().use { check(it) }
+    }
+
     fun ls(path: String): LsResult =
         client.newCall(request("GET", url("ls", query = mapOf("path" to path)))).execute().use { r ->
             check(r)

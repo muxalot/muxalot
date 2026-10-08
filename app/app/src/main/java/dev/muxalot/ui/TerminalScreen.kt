@@ -84,6 +84,7 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
     val shortcuts = remember { ShortcutStore(ctx).load() }
     var newTab by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf<String?>(null) }
+    var renaming by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(ctrl) {
         ctrl.load()
@@ -153,7 +154,11 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                     items(ctrl.tabs, key = { it }) { name ->
                         val sel = name == ctrl.selected
                         // the selected tab's state is the dot in the header
-                        MuxChip(name, sel, { ctrl.selected = name }, dot = if (sel) null else stateColor(ctrl.states[name]))
+                        MuxChip(
+                            name, sel, { ctrl.selected = name },
+                            dot = if (sel) null else stateColor(ctrl.states[name]),
+                            onLongClick = { renaming = name },
+                        )
                     }
                 }
             }
@@ -210,6 +215,30 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                     TextButton(onClick = { ctrl.closeTab(name, kill = false); closing = null }) { Text("Detach") }
                 }
             },
+        )
+    }
+
+    renaming?.let { orig ->
+        var name by remember(orig) { mutableStateOf(orig) }
+        AlertDialog(
+            onDismissRequest = { renaming = null },
+            title = { Text("Rename tab") },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.trim() },
+                    label = { Text("Name (letters, digits, - _)") },
+                    singleLine = true,
+                    isError = name.isNotEmpty() && !ctrl.validName(name),
+                )
+            },
+            confirmButton = {
+                TextButton(enabled = ctrl.validName(name) && name != orig, onClick = {
+                    ctrl.renameTab(orig, name)
+                    renaming = null
+                }) { Text("Rename") }
+            },
+            dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
         )
     }
 }

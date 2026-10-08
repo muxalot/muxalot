@@ -1,7 +1,9 @@
 package dev.muxalot.ui.kit
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,13 +56,14 @@ fun MuxCard(
 }
 
 /** Pill; selected is solid mint. [dot] is a status color shown before the label. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MuxChip(label: String, selected: Boolean, onClick: () -> Unit, dot: Color? = null) {
+fun MuxChip(label: String, selected: Boolean, onClick: () -> Unit, dot: Color? = null, onLongClick: (() -> Unit)? = null) {
     val m = Mux.colors
     Row(
         Modifier.clip(CircleShape)
             .background(if (selected) m.mint else MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

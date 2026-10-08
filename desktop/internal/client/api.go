@@ -240,6 +240,25 @@ func (c *Client) Kill(name string) error {
 	return nil
 }
 
+// Renames a tmux session; the agent answers 409 when the new name is taken.
+func (c *Client) Rename(from, to string) error {
+	if !ValidSession(from) || !ValidSession(to) {
+		return errors.New("invalid session name")
+	}
+	b, _ := json.Marshal(map[string]string{"to": to})
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, err := c.do(ctx, http.MethodPost, c.endpoint("/sessions/"+from+"/rename", nil), bytes.NewReader(b), int64(len(b)))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return apiError(resp)
+	}
+	return nil
+}
+
 func (c *Client) Ls(path string) (LsResult, error) {
 	var out LsResult
 	err := c.getJSON(c.endpoint("/ls", url.Values{"path": {path}}), &out)

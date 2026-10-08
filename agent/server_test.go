@@ -440,6 +440,35 @@ func TestKillAlreadyGoneIsNoContent(t *testing.T) {
 	}
 }
 
+func TestRename(t *testing.T) {
+	isolatedTmux(t)
+	ts, st, _ := setup(t)
+	dev := pairDevice(t, ts, st)
+	for _, n := range []string{"old", "busy"} {
+		if err := exec.Command("tmux", "new-session", "-d", "-s", n).Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	post := func(target, body string) int {
+		return req(t, "POST", ts.URL+"/sessions/"+target+"/rename", dev, strings.NewReader(body)).StatusCode
+	}
+	if c := post("old", `{"to":"new"}`); c != 204 {
+		t.Fatalf("rename: got %d, want 204", c)
+	}
+	if exec.Command("tmux", "has-session", "-t", "=new").Run() != nil {
+		t.Fatal("session not renamed")
+	}
+	if c := post("gone", `{"to":"x"}`); c != 404 {
+		t.Fatalf("missing session: got %d, want 404", c)
+	}
+	if c := post("new", `{"to":"busy"}`); c != 409 {
+		t.Fatalf("taken name: got %d, want 409", c)
+	}
+	if c := post("new", `{"to":"bad name"}`); c != 400 {
+		t.Fatalf("bad name: got %d, want 400", c)
+	}
+}
+
 func TestNewSessionStartsInHome(t *testing.T) {
 	isolatedTmux(t)
 	home, _ := filepath.EvalSymlinks(t.TempDir())

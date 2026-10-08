@@ -62,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ws", s.auth(s.handleWS))
 	mux.HandleFunc("GET /sessions", s.auth(s.handleSessions))
 	mux.HandleFunc("DELETE /sessions/{name}", s.auth(s.handleKill))
+	mux.HandleFunc("POST /sessions/{name}/rename", s.auth(s.handleRename))
 	mux.HandleFunc("GET /ls", s.auth(s.handleLs))
 	mux.HandleFunc("GET /files", s.auth(s.handleDownload))
 	mux.HandleFunc("PUT /files", s.auth(s.handleUpload))
@@ -519,6 +520,30 @@ func (s *Server) handleKill(w http.ResponseWriter, r *http.Request) {
 	if err := exec.Command("tmux", "kill-session", "-t", "="+name).Run(); err != nil &&
 		exec.Command("tmux", "has-session", "-t", "="+name).Run() == nil {
 		http.Error(w, "kill failed", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var req struct {
+		To string `json:"to"`
+	}
+	if !sessionRe.MatchString(name) || json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&req) != nil || !sessionRe.MatchString(req.To) {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	// "="+name targets exactly this session (same convention as handleKill).
+	if exec.Command("tmux", "rename-session", "-t", "="+name, req.To).Run() != nil {
+		switch {
+		case exec.Command("tmux", "has-session", "-t", "="+name).Run() != nil:
+			http.Error(w, "no such session", http.StatusNotFound)
+		case exec.Command("tmux", "has-session", "-t", "="+req.To).Run() == nil:
+			http.Error(w, "name in use", http.StatusConflict)
+		default:
+			http.Error(w, "rename failed", http.StatusInternalServerError)
+		}
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

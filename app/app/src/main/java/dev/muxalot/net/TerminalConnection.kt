@@ -22,7 +22,7 @@ enum class ConnState { CONNECTING, CONNECTED, RECONNECTING, EXITED }
  *
  * Callbacks arrive on OkHttp threads.
  */
-class TerminalConnection(private val server: Server, val session: String) {
+class TerminalConnection(private val server: Server, var session: String) {
     var onOpen: (() -> Unit)? = null
     var onData: ((ByteArray) -> Unit)? = null
     var onClip: ((String) -> Unit)? = null

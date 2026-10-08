@@ -75,6 +75,30 @@ class TerminalController(val server: Server, private val scope: CoroutineScope) 
 
     fun kick() = conns.values.toList().forEach { it.kick() }
 
+    /** Rename the tmux session on the server; the WS stays attached through the rename. */
+    fun renameTab(from: String, to: String) {
+        if (!validName(to) || from == to) return
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { api.rename(from, to) }
+            } catch (e: Exception) {
+                error = "Rename failed: ${e.message}"
+                return@launch
+            }
+            conns.remove(from)?.let {
+                it.session = to // so a later kick() reconnects to the new name, not a resurrected old one
+                it.onState = { s -> states[to] = s }
+                conns[to] = it
+            }
+            encs.remove(from)?.let { encs[to] = it }
+            states[from]?.let { states[to] = it }
+            states.remove(from)
+            val i = tabs.indexOf(from)
+            if (i >= 0) tabs[i] = to
+            if (selected == from) selected = to
+        }
+    }
+
     fun dispose() {
         conns.values.toList().forEach { it.close() }
         conns.clear()

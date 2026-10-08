@@ -216,6 +216,7 @@ function renderTabs() {
     name.className = 'name';
     name.textContent = t.name;
     name.addEventListener('click', () => select(t.key));
+    name.addEventListener('contextmenu', (e) => { e.preventDefault(); renameTab(t); });
     const x = document.createElement('button');
     x.className = 'x';
     x.textContent = '×';
@@ -250,6 +251,27 @@ function dispose(t) {
   t.term.dispose();
   t.el.remove();
   tabs.delete(t.key);
+}
+
+async function renameTab(t) {
+  for (;;) {
+    const r = await ask({
+      title: `Rename "${t.name}"`,
+      body: 'Letters, digits, - and _ (max 32). Renames the tmux session on the server.',
+      input: 'text',
+      initial: t.name,
+      buttons: [{ label: 'Cancel', value: null }, { label: 'Rename', value: true, primary: true }],
+    });
+    if (!r.value) return;
+    if (!NAME_RE.test(r.text)) { fail('Invalid session name'); continue; }
+    if (r.text === t.name) return;
+    try { await call('Rename', t.server, t.name, r.text); } catch (e) { return fail(e); }
+    // the stream is keyed by the session name everywhere, so detach and reopen
+    // (same reset as any reconnect; the tab moves to the end of the strip)
+    await call('Detach', t.server, t.name, false).catch(() => {});
+    dispose(t);
+    await openTab(r.text);
+  }
 }
 
 Events.On('term:data', (ev) => {

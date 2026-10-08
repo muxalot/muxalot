@@ -232,6 +232,22 @@ func TestTerminalSessionsAndFiles(t *testing.T) {
 		t.Fatal("Ls outside the files root must fail")
 	}
 
+	// rename the live session; the attached stream keeps running
+	if err := c.Rename("e2e", "e2e2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cn.Send([]byte("echo still-alive-$((7*6))\r")); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "stream after rename", 10*time.Second, func() bool { return s.has("still-alive-42") })
+	if err := c.Rename("e2e2", "e2e"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "renamed back", 5*time.Second, func() bool {
+		l, _ := c.Sessions()
+		return len(l) == 1 && l[0].Name == "e2e"
+	})
+
 	// kill; the attached connection sees the session end
 	if err := c.Kill("e2e"); err != nil {
 		t.Fatal(err)

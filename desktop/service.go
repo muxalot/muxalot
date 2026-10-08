@@ -262,6 +262,16 @@ func (s *Service) Detach(id, session string, kill bool) error {
 	return c.Kill(session)
 }
 
+// Rename renames the tmux session on the server. The frontend detaches and
+// re-opens any tab it held under the old name.
+func (s *Service) Rename(id, from, to string) error {
+	c, err := s.api(id)
+	if err != nil {
+		return err
+	}
+	return c.Rename(from, to)
+}
+
 func (s *Service) conn(id, session string) (*client.Conn, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
