@@ -38,7 +38,7 @@ code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
 #app { height: 100%; display: flex; flex-direction: column; }
 header { display: flex; gap: 8px; align-items: center; padding: 6px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
 #tabs { display: flex; gap: 4px; overflow-x: auto; }
-#tabs .tab { display: flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; white-space: nowrap; border: 1px solid var(--line); border-radius: 6px; }
+#tabs .tab { display: flex; align-items: center; gap: 6px; padding: 2px 4px 2px 10px; white-space: nowrap; border: 1px solid var(--line); border-radius: 8px 8px 0 0; }
 #tabs .tab.on { border-color: var(--mint); }
 #tabs .name { border: 0; background: none; padding: 2px 4px; }
 #tabs .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
@@ -61,3 +61,14 @@ header { display: flex; gap: 8px; align-items: center; padding: 6px 8px; backgro
 #modal h2 { margin: 0; font-size: 16px; }
 #modal pre { margin: 0; max-height: 40vh; overflow: auto; white-space: pre-wrap; word-break: break-all; color: var(--dim); }
 #modal .row { justify-content: flex-end; }
+
+/* tab context menu */
+#tabmenu { position: fixed; z-index: 30; display: grid; min-width: 190px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px 8px 0 0; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+#tabmenu button { border: 0; border-radius: 4px; text-align: left; padding: 7px 12px; background: none; }
+#tabmenu button:hover { background: #232c39; border: 0; }
+#tabmenu .has-sub { position: relative; }
+#tabmenu .sub { display: none; position: absolute; left: 100%; top: 0; z-index: 31; min-width: 170px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+#tabmenu .has-sub:hover .sub { display: grid; }
+#tabmenu .sw { display: flex; gap: 8px; align-items: center; text-align: left; padding: 6px 12px; border: 0; border-radius: 4px; background: none; cursor: pointer; }
+#tabmenu .sw:hover { background: #232c39; }
+#tabmenu .sw .chip { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }

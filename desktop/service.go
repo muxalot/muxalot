@@ -272,6 +272,16 @@ func (s *Service) Rename(id, from, to string) error {
 	return c.Rename(from, to)
 }
 
+// TabColors lists the locally chosen chip colors for one server: session -> color.
+func (s *Service) TabColors(id string) map[string]string {
+	return s.cfg.TabColors()[id]
+}
+
+// SetTabColor records the client-side chip color for a tab; an empty color clears it.
+func (s *Service) SetTabColor(id, session, color string) error {
+	return s.cfg.SetTabColor(id, session, color)
+}
+
 func (s *Service) conn(id, session string) (*client.Conn, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -48,3 +48,35 @@ func TestCorruptFileIsEmpty(t *testing.T) {
 		t.Fatalf("Add over a corrupt file: %v", err)
 	}
 }
+
+func TestTabColors(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	if m := s.TabColors(); len(m) != 0 {
+		t.Fatalf("fresh store = %v", m)
+	}
+	if err := s.SetTabColor("s1", "main", "green"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTabColor("s1", "main", "red"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTabColor("s2", "x", ""); err != nil {
+		t.Fatalf("clearing an unset color: %v", err)
+	}
+	r := New(dir)
+	if c := r.TabColors()["s1"]["main"]; c != "red" {
+		t.Fatalf("reloaded color = %q", c)
+	}
+	if err := r.SetTabColor("s1", "main", ""); err != nil {
+		t.Fatal(err)
+	}
+	if m := r.TabColors(); len(m["s1"]) != 0 {
+		t.Fatalf("after clear = %v", m)
+	}
+	// a corrupt file is as good as none
+	os.WriteFile(filepath.Join(dir, "tabcolors.json"), []byte("{oh no"), 0o600)
+	if m := New(dir).TabColors(); len(m) != 0 {
+		t.Fatalf("corrupt = %v", m)
+	}
+}

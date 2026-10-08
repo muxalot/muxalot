@@ -40,6 +40,27 @@ class ServerStore(ctx: Context) {
     }
 }
 
+/** Per-tab chip colors, client-side only: "serverId/session" -> ARGB int (0 = no color). */
+class TabColorStore(ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("tabcolors", Context.MODE_PRIVATE)
+
+    fun get(server: String, session: String): Int = prefs.getInt("$server/$session", 0)
+
+    fun set(server: String, session: String, argb: Int) {
+        prefs.edit().apply {
+            if (argb == 0) remove("$server/$session") else putInt("$server/$session", argb)
+        }.apply()
+    }
+
+    fun rekey(server: String, from: String, to: String) {
+        val v = get(server, from)
+        if (v != 0) {
+            set(server, from, 0)
+            set(server, to, v)
+        }
+    }
+}
+
 /** Opt-in device-credential lock for the whole app; enforced in MainActivity. */
 class AppLock(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("applock", Context.MODE_PRIVATE)

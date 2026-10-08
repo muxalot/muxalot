@@ -13,6 +13,8 @@ const tabs = new Map(); // "server/name" -> tab
 let active = null; // key of the visible tab
 let fontSize = 14;
 let confirming = false; // one OSC 52 prompt at a time
+const CHIP_COLORS = { Blue: '#3465a4', Green: '#73d216', Orange: '#f57900', Purple: '#75507b', Red: '#cc0000', Yellow: '#edd400' };
+const tabColors = new Map(); // "server/name" -> hex color
 
 const msg = (e) => (e && e.message) || String(e);
 
@@ -209,6 +211,8 @@ function renderTabs() {
     if (t.server !== cur) continue;
     const tab = document.createElement('div');
     tab.className = 'tab' + (t.key === active ? ' on' : '');
+    const c = tabColors.get(t.key);
+    if (c) tab.style.borderBottom = '4px solid ' + c;
     const dot = document.createElement('span');
     dot.className = 'dot ' + t.state;
     dot.title = t.state;
@@ -216,7 +220,7 @@ function renderTabs() {
     name.className = 'name';
     name.textContent = t.name;
     name.addEventListener('click', () => select(t.key));
-    name.addEventListener('contextmenu', (e) => { e.preventDefault(); renameTab(t); });
+    name.addEventListener('contextmenu', (e) => { e.preventDefault(); showTabMenu(t, e); });
     const x = document.createElement('button');
     x.className = 'x';
     x.textContent = '×';
@@ -251,6 +255,90 @@ function dispose(t) {
   t.term.dispose();
   t.el.remove();
   tabs.delete(t.key);
+  tabColors.delete(t.key); // reappears for the same session name after refresh
+}
+
+// ---------------------------------------------------------------- tab context menu
+
+let menuTab = null; // the tab the open context menu acts on
+
+function showTabMenu(t, e) {
+  select(t.key); // GNOME behavior: opening the menu focuses that tab
+  menuTab = t;
+  buildColorSub();
+  const m = $('tabmenu');
+  m.hidden = false;
+  m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - m.offsetHeight - 8) + 'px';
+}
+
+function hideTabMenu() {
+  menuTab = null;
+  $('tabmenu').hidden = true;
+}
+
+function buildColorSub() {
+  const sub = $('colorsub');
+  sub.replaceChildren();
+  const cur = menuTab ? tabColors.get(menuTab.key) || '' : '';
+  const add = (label, hex) => {
+    const b = document.createElement('button');
+    b.className = 'sw';
+    b.dataset.color = hex;
+    b.textContent = (hex && cur === hex ? '✓ ' : '') + label;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    if (hex) chip.style.background = hex;
+    b.prepend(chip);
+    sub.append(b);
+  };
+  add('No color', '');
+  for (const [n, hex] of Object.entries(CHIP_COLORS)) add(n, hex);
+}
+
+$('tabmenu').addEventListener('click', (e) => {
+  const act = e.target.closest('button')?.dataset?.act;
+  if (!act || !menuTab || act === 'color') return; // color opens the hover submenu
+  const t = menuTab;
+  hideTabMenu();
+  if (act === 'rename') return renameTab(t);
+  const all = [...tabs.values()].filter((x) => x.server === t.server);
+  const i = all.indexOf(t);
+  const list = act === 'close-others' ? all.filter((x) => x !== t)
+    : act === 'close-left' ? all.slice(0, i)
+    : all.slice(i + 1);
+  bulkClose(t, list);
+});
+
+$('colorsub').addEventListener('click', async (e) => {
+  if (!menuTab) return;
+  const hex = e.target.closest('.sw')?.dataset?.color;
+  if (hex === undefined || !menuTab) return;
+  const t = menuTab;
+  hideTabMenu();
+  if (hex) tabColors.set(t.key, hex); else tabColors.delete(t.key);
+  try { await call('SetTabColor', t.server, t.name, hex); } catch (err) { fail(err); }
+  renderTabs();
+});
+
+document.addEventListener('click', (e) => {
+  if (!$('tabmenu').hidden && !e.target.closest('#tabmenu') && !e.target.closest('#tabs .name')) hideTabMenu();
+});
+
+async function bulkClose(target, list) {
+  if (!list.length) return;
+  const r = await ask({
+    title: `Detach ${list.length} tab${list.length > 1 ? 's' : ''}?`,
+    body: 'Sessions keep running on the server and come back when reopened or refreshed.',
+    buttons: [{ label: 'Cancel', value: null }, { label: 'Detach', value: true, primary: true }],
+  });
+  if (!r.value) return;
+  for (const x of list) {
+    try { await call('Detach', x.server, x.name, false); } catch (err) { fail(err); }
+    dispose(x);
+  }
+  renderTabs();
+  select(target.key);
 }
 
 async function renameTab(t) {
@@ -266,6 +354,13 @@ async function renameTab(t) {
     if (!NAME_RE.test(r.text)) { fail('Invalid session name'); continue; }
     if (r.text === t.name) return;
     try { await call('Rename', t.server, t.name, r.text); } catch (e) { return fail(e); }
+    const oldColor = tabColors.get(t.key);
+    if (oldColor) { // keep the chip color across the rename, on disk too
+      tabColors.delete(t.key);
+      tabColors.set(t.server + '/' + r.text, oldColor);
+      call('SetTabColor', t.server, t.name, '').catch(() => {});
+      call('SetTabColor', t.server, r.text, oldColor).catch(() => {});
+    }
     // the stream is keyed by the session name everywhere, so detach and reopen
     // (same reset as any reconnect; the tab moves to the end of the strip)
     await call('Detach', t.server, t.name, false).catch(() => {});
@@ -328,6 +423,7 @@ async function loadServer(id) {
   let names = [];
   try {
     names = await call('Sessions', id);
+    for (const [k, v] of Object.entries(await call('TabColors', id) || {})) if (v) tabColors.set(id + '/' + k, v);
   } catch (e) {
     if (/locked/i.test(msg(e)) && await unlockPrompt(id)) return loadServer(id);
     fail(e);

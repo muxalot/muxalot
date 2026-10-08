@@ -3,8 +3,8 @@ package dev.muxalot.ui.kit
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
@@ -29,7 +29,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -55,14 +59,33 @@ fun MuxCard(
     else Card(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, colors = colors, border = border, content = content)
 }
 
-/** Pill; selected is solid mint. [dot] is a status color shown before the label. */
+/** Chip color presets for terminal tabs (Tango palette, GNOME Terminal's menu colors). */
+val TabChipColors: Map<String, Int> = linkedMapOf(
+    "Blue" to 0xFF3465A4.toInt(), "Green" to 0xFF73D216.toInt(), "Orange" to 0xFFF57900.toInt(),
+    "Purple" to 0xFF75507B.toInt(), "Red" to 0xFFCC0000.toInt(), "Yellow" to 0xFFEDD400.toInt(),
+)
+
+/** Round tab shape with a straight bottom edge, like a folder tab. */
+val TabShape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+
+/** Pill; selected is solid mint. [dot] is a status color shown before the label.
+ *  [color] paints a thick bottom edge (tab chips); [shape] overrides the pill. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MuxChip(label: String, selected: Boolean, onClick: () -> Unit, dot: Color? = null, onLongClick: (() -> Unit)? = null) {
+fun MuxChip(
+    label: String, selected: Boolean, onClick: () -> Unit,
+    dot: Color? = null, onLongClick: (() -> Unit)? = null,
+    color: Color? = null, shape: Shape = CircleShape,
+) {
     val m = Mux.colors
     Row(
-        Modifier.clip(CircleShape)
+        Modifier.clip(shape)
             .background(if (selected) m.mint else MaterialTheme.colorScheme.surfaceVariant)
+            .then(
+                if (color != null) Modifier.drawBehind {
+                    drawRect(color, topLeft = Offset(0f, size.height - 5.dp.toPx()), size = Size(size.width, 5.dp.toPx()))
+                } else Modifier
+            )
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

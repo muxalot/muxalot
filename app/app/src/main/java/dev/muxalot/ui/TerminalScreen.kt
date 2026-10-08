@@ -38,6 +38,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -46,6 +47,9 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -69,7 +73,10 @@ import androidx.compose.ui.unit.sp
 import dev.muxalot.data.Server
 import dev.muxalot.data.Shortcut
 import dev.muxalot.data.ShortcutStore
+import dev.muxalot.data.TabColorStore
 import dev.muxalot.net.ConnState
+import dev.muxalot.ui.kit.TabChipColors
+import dev.muxalot.ui.kit.TabShape
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -78,13 +85,16 @@ import kotlinx.coroutines.launch
 fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val ctrl = remember(server.id) { TerminalController(server, scope) }
+    val ctrl = remember(server.id) { TerminalController(server, scope, TabColorStore(ctx)) }
     var fontSize by rememberSaveable { mutableIntStateOf(14) }
     var menu by remember { mutableStateOf(false) }
     val shortcuts = remember { ShortcutStore(ctx).load() }
     var newTab by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf<String?>(null) }
+    var menuTab by remember { mutableStateOf<String?>(null) }
+    var colorMenu by remember { mutableStateOf(false) }
+    var bulk by remember { mutableStateOf<BulkClose?>(null) }
 
     DisposableEffect(ctrl) {
         ctrl.load()
@@ -154,11 +164,50 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                     items(ctrl.tabs, key = { it }) { name ->
                         val sel = name == ctrl.selected
                         // the selected tab's state is the dot in the header
-                        MuxChip(
-                            name, sel, { ctrl.selected = name },
-                            dot = if (sel) null else stateColor(ctrl.states[name]),
-                            onLongClick = { renaming = name },
-                        )
+                        Box {
+                            MuxChip(
+                                name, sel, { ctrl.selected = name },
+                                dot = if (sel) null else stateColor(ctrl.states[name]),
+                                onLongClick = { ctrl.selected = name; colorMenu = false; menuTab = name },
+                                color = ctrl.tabColors[name]?.let { Color(it) },
+                                shape = TabShape,
+                            )
+                            DropdownMenu(
+                                expanded = menuTab == name,
+                                onDismissRequest = { menuTab = null; colorMenu = false },
+                            ) {
+                                val i = ctrl.tabs.indexOf(name)
+                                fun closeBulk(title: String, names: List<String>) {
+                                    menuTab = null
+                                    if (names.isNotEmpty()) bulk = BulkClose(title, names)
+                                }
+                                DropdownMenuItem(text = { Text("Rename") }, onClick = { menuTab = null; renaming = name })
+                                DropdownMenuItem(
+                                    text = { Text("Color") },
+                                    trailingIcon = {
+                                        Icon(Icons.Filled.ArrowDropDown, null)
+                                        DropdownMenu(expanded = colorMenu, onDismissRequest = { colorMenu = false }) {
+                                            DropdownMenuItem(
+                                                text = { Text("No color") },
+                                                leadingIcon = { if (ctrl.tabColors[name] == null) Icon(Icons.Filled.Check, null) },
+                                                onClick = { ctrl.setColor(name, 0); menuTab = null; colorMenu = false },
+                                            )
+                                            for ((n, argb) in TabChipColors) {
+                                                DropdownMenuItem(
+                                                    text = { Text(n) },
+                                                    leadingIcon = { if (ctrl.tabColors[name] == argb) Icon(Icons.Filled.Check, null) },
+                                                    onClick = { ctrl.setColor(name, argb); menuTab = null; colorMenu = false },
+                                                )
+                                            }
+                                        }
+                                    },
+                                    onClick = { colorMenu = true },
+                                )
+                                DropdownMenuItem(text = { Text("Close others") }, onClick = { closeBulk("Close other tabs", ctrl.tabs.filter { it != name }) })
+                                DropdownMenuItem(text = { Text("Close to the left") }, onClick = { closeBulk("Close tabs to the left", ctrl.tabs.take(i)) })
+                                DropdownMenuItem(text = { Text("Close to the right") }, onClick = { closeBulk("Close tabs to the right", ctrl.tabs.drop(i + 1)) })
+                            }
+                        }
                     }
                 }
             }
@@ -241,7 +290,24 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
             dismissButton = { TextButton(onClick = { renaming = null }) { Text("Cancel") } },
         )
     }
+
+    bulk?.let { b ->
+        AlertDialog(
+            onDismissRequest = { bulk = null },
+            title = { Text(b.title) },
+            text = {
+                Text("Detach ${b.names.size} tab${if (b.names.size == 1) "" else "s"}? Sessions keep running on the server and come back when reopened or refreshed.")
+            },
+            confirmButton = {
+                TextButton(onClick = { b.names.forEach { ctrl.closeTab(it, kill = false) }; bulk = null }) { Text("Detach") }
+            },
+            dismissButton = { TextButton(onClick = { bulk = null }) { Text("Cancel") } },
+        )
+    }
 }
+
+/** One bulk-close confirmation: title + the tabs to detach. */
+private data class BulkClose(val title: String, val names: List<String>)
 
 private class FanKey(
     val label: String, // short face text on the round button

@@ -13,7 +13,7 @@ import (
 // list is a security decision: see the comment on Service.
 func TestBoundSurface(t *testing.T) {
 	want := []string{"Attach", "Detach", "Download", "Forget", "Ls", "Pair", "Paste", "Rename",
-		"Resize", "Send", "Servers", "Sessions", "SetClipboard", "Unlock", "Upload"}
+		"Resize", "Send", "Servers", "Sessions", "SetClipboard", "SetTabColor", "TabColors", "Unlock", "Upload"}
 	var got []string
 	typ := reflect.TypeOf(&Service{})
 	for i := 0; i < typ.NumMethod(); i++ {
