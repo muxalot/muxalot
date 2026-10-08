@@ -58,7 +58,8 @@ libexpat.so.1 libz.so.1 libgmp.so.10 libgpg-error.so.0 libcom_err.so.2"
 args=""
 libexec_cache=$(ldconfig -p 2>/dev/null) # read once: awk's early exit after a pipe is SIGPIPE (141) under pipefail
 for l in $libs; do
-  p=$(printf '%s\n' "$libexec_cache" | awk -v l="$l" '$1==l {print $NF; exit}')
+  # awk reads the whole cache (no early exit, so no SIGPIPE) and prints at most one match
+  p=$(printf '%s\n' "$libexec_cache" | awk -v l="$l" '$1==l && !done {done=1; print $NF}')
   [ -n "$p" ] || { echo "cannot resolve $l on this host" >&2; exit 1; }
   args="$args --library $p"
 done
