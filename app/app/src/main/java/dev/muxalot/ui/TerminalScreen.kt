@@ -26,8 +26,10 @@ import dev.muxalot.ui.kit.ScreenHeader
 import dev.muxalot.ui.kit.StatusDot
 import dev.muxalot.ui.kit.stateColor
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -77,6 +79,7 @@ import dev.muxalot.data.TabColorStore
 import dev.muxalot.net.ConnState
 import dev.muxalot.ui.kit.TabChipColors
 import dev.muxalot.ui.kit.TabShape
+import dev.muxalot.ui.theme.Mux
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -226,7 +229,7 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                 if (ctrl.tabs.isEmpty()) {
                     Text("No sessions. Tap +.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
                 }
-                ctrl.selected?.let { KeyFan(ctrl.enc(it), shortcuts, Modifier.fillMaxSize()) }
+                ctrl.selected?.let { ShortcutDock(ctrl.enc(it), shortcuts, Modifier.fillMaxSize()) }
             }
         }
     }
@@ -323,24 +326,17 @@ private class FanGroup(val label: String, val name: String, val keys: List<FanKe
 private const val BTN = 44 // dp, key button diameter
 private const val STEP = 50 // dp, vertical spacing in a stack
 private const val COL_W = 190 // dp, button + label
-private const val EDGE = 8 // dp, gap to the screen corner
-private const val MAIN = 48 // dp, fan button diameter
+private const val EDGE = 8 // dp, gap between the bar and stacked keys
+private const val BAR = 48 // dp, shortcut bar height
 
 private fun fanGroups(enc: InputEncoder, shortcuts: List<Shortcut>): List<FanGroup> {
-    fun k(label: String, name: String, f: () -> Unit) = FanKey(label, name, act = f)
     fun r(label: String, name: String, f: () -> Unit) = FanKey(label, name, repeat = true, act = f)
-    fun ctl(letter: Char, name: String) = k("^$letter", name) { enc.raw((letter.code and 0x1f).toChar().toString()) }
+    fun ctl(letter: Char, name: String) = FanKey("^$letter", name) { enc.raw((letter.code and 0x1f).toChar().toString()) }
     val fkeys = Key.entries.filter { it.name.length in 2..3 && it.name.startsWith("F") && it.name.drop(1).all(Char::isDigit) }
     return listOf(
         FanGroup("Mod", "Modifiers", listOf(
-            k("Esc", "Escape") { enc.key(Key.ESC) },
-            k("Tab", "Tab") { enc.key(Key.TAB) },
             FanKey("Ctrl", "Ctrl (sticky)", active = { enc.ctrl }) { enc.ctrl = !enc.ctrl },
             FanKey("Alt", "Alt (sticky)", active = { enc.alt }) { enc.alt = !enc.alt },
-        )),
-        FanGroup("↑↓", "Arrows", listOf(
-            r("←", "Left") { enc.key(Key.LEFT) }, r("↓", "Down") { enc.key(Key.DOWN) },
-            r("↑", "Up") { enc.key(Key.UP) }, r("→", "Right") { enc.key(Key.RIGHT) },
         )),
         FanGroup("^", "Ctrl combos", listOf(
             FanKey("Ctrl", "Ctrl (sticky)", active = { enc.ctrl }) { enc.ctrl = !enc.ctrl },
@@ -350,14 +346,14 @@ private fun fanGroups(enc: InputEncoder, shortcuts: List<Shortcut>): List<FanGro
             ctl('U', "Kill line"), ctl('W', "Delete word"), ctl('Z', "Suspend"),
         )),
         FanGroup("|~", "Symbols", listOf(
-            "|" to "Pipe", "~" to "Tilde", "/" to "Slash", "-" to "Dash", "_" to "Underscore",
-        ).map { (s, n) -> k(s, n) { enc.text(s) } }),
+            "|" to "Pipe", "~" to "Tilde", "-" to "Dash", "_" to "Underscore",
+        ).map { (s, n) -> FanKey(s, n) { enc.text(s) } }),
         FanGroup("Nav", "Navigation", listOf(
-            k("Home", "Home") { enc.key(Key.HOME) }, k("End", "End") { enc.key(Key.END) },
+            FanKey("Home", "Home") { enc.key(Key.HOME) }, FanKey("End", "End") { enc.key(Key.END) },
             r("PgUp", "Page up") { enc.key(Key.PGUP) }, r("PgDn", "Page down") { enc.key(Key.PGDN) },
-            k("Del", "Delete") { enc.key(Key.DELETE) },
+            FanKey("Del", "Delete") { enc.key(Key.DELETE) },
         )),
-        FanGroup("Fn", "F-keys", fkeys.map { f -> k(f.name, f.name) { enc.key(f) } }),
+        FanGroup("Fn", "F-keys", fkeys.map { f -> FanKey(f.name, f.name) { enc.key(f) } }),
         FanGroup("🤖", "Claude", shortcuts.map { s ->
             FanKey(s.label, s.text, closes = true) { enc.text(s.text); if (s.enter) enc.key(Key.ENTER) }
         }),
@@ -365,12 +361,13 @@ private fun fanGroups(enc: InputEncoder, shortcuts: List<Shortcut>): List<FanGro
 }
 
 /**
- * Bottom-left button that stacks labelled shortcut keys upward: first groups, then the group's keys.
- * Stacks too tall for the screen continue in a column to the right. Stays open (sticky Ctrl/Alt,
- * held arrows) until the button or the dimmed terminal is tapped.
+ * Full-width shortcut bar over the terminal's bottom edge — Esc, Tab, /, :, the arrows —
+ * with ▲ opening the drill-in stack (first groups, then the group's keys) above the bar.
+ * Stacks too tall for the screen continue in a column to the right. The dock stays open
+ * (sticky Ctrl/Alt, held arrows) until the toggle or the dimmed terminal is tapped.
  */
 @Composable
-fun KeyFan(enc: InputEncoder, shortcuts: List<Shortcut>, modifier: Modifier = Modifier) {
+fun ShortcutDock(enc: InputEncoder, shortcuts: List<Shortcut>, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     var group by remember { mutableStateOf<FanGroup?>(null) }
     val groups = remember(enc, shortcuts) { fanGroups(enc, shortcuts) }
@@ -382,25 +379,47 @@ fun KeyFan(enc: InputEncoder, shortcuts: List<Shortcut>, modifier: Modifier = Mo
         }
         val g = group
         val items: List<FanKey> = if (open) g?.keys ?: groups.map { fg -> FanKey(fg.label, fg.name) { group = fg } } else emptyList()
-        val perCol = ((maxHeight.value - EDGE - MAIN - EDGE) / STEP).toInt().coerceAtLeast(1)
+        val perCol = ((maxHeight.value - EDGE - BAR - EDGE) / STEP).toInt().coerceAtLeast(1)
         items.forEachIndexed { i, item ->
-            val col = i / perCol
-            val row = i % perCol
             FanRow(
                 item,
                 Modifier.align(Alignment.BottomStart).offset(
-                    x = (EDGE + col * COL_W).dp,
-                    y = -(EDGE + MAIN + EDGE + row * STEP).dp,
+                    x = (EDGE + (i / perCol) * COL_W).dp,
+                    y = -(EDGE + BAR + EDGE + (i % perCol) * STEP).dp,
                 ),
                 if (item.closes) { { item.act(); close() } } else item.act,
             )
         }
-        FanButton(
-            if (!open) "⌨" else if (g != null) "‹" else "✕", !open && (enc.ctrl || enc.alt),
-            Modifier.align(Alignment.BottomStart).padding(EDGE.dp)
-                .fanPress(false) { if (!open) open = true else if (g != null) group = null else close() },
-            size = MAIN,
-        )
+        Row(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(BAR.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            @Composable
+            fun cell(label: String, repeat: Boolean = false, act: () -> Unit) = Box(
+                Modifier.weight(1f).fillMaxHeight().fanPress(repeat, act),
+                contentAlignment = Alignment.Center,
+            ) { Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp) }
+            cell("ESC") { enc.key(Key.ESC) }
+            cell("TAB") { enc.key(Key.TAB) }
+            cell("/") { enc.text("/") }
+            cell(":") { enc.text(":") }
+            cell("↑", true) { enc.key(Key.UP) }
+            cell("↓", true) { enc.key(Key.DOWN) }
+            cell("←", true) { enc.key(Key.LEFT) }
+            cell("→", true) { enc.key(Key.RIGHT) }
+            val stuck = enc.ctrl || enc.alt
+            Box(
+                Modifier.weight(1f).fillMaxHeight()
+                    .background(if (stuck) Mux.colors.mint else Color.Transparent)
+                    .fanPress(false) { if (!open) open = true else if (g != null) group = null else close() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    if (!open) "▲" else if (g != null) "‹" else "▼",
+                    color = if (stuck) Mux.colors.onMint else MaterialTheme.colorScheme.onSurface,
+                    fontSize = 15.sp,
+                )
+            }
+        }
     }
 }
 

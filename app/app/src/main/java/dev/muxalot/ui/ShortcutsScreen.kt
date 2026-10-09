@@ -49,7 +49,7 @@ import dev.muxalot.ui.kit.ScreenHeader
 
 private const val MAX_LABEL = 4 // fits the round fan button
 
-/** Add, edit and delete the shortcuts in the fan's Claude group. */
+/** Add, edit and delete the shortcuts in the Claude group. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShortcutsScreen(store: ShortcutStore, onBack: () -> Unit) {
