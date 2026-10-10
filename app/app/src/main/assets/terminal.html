@@ -25,6 +25,10 @@
     cursorBlink: true,
     scrollback: 1000,
     allowProposedApi: true,
+    // OSC 8 hyperlinks come from terminal output; only http(s) goes to the app, which asks first.
+    linkHandler: {
+      activate(e, text) { if (/^https?:\/\//i.test(text)) Android.onLink(text); },
+    },
     theme: { background: '#0b0f14', foreground: '#d8dee9', cursor: '#ffcc66' },
   });
   const fit = new FitAddon.FitAddon();

@@ -130,6 +130,18 @@ function osc52(t, data) {
   return true;
 }
 
+async function offerLink(url) {
+  if (confirming || !/^https?:\/\//i.test(url)) return;
+  confirming = true;
+  const r = await ask({
+    title: 'Terminal link',
+    body: url.length > 300 ? url.slice(0, 300) + '…' : url,
+    buttons: [{ label: 'Close', value: false }, { label: 'Copy link', value: true, primary: true }],
+  });
+  confirming = false;
+  if (r.value) call('SetClipboard', url).catch(fail);
+}
+
 async function doPaste(t, text) {
   if (!text) return;
   const bracketed = t.term.modes.bracketedPasteMode;
@@ -158,6 +170,8 @@ async function openTab(name) {
     cursorBlink: true,
     scrollback: 5000,
     allowProposedApi: true,
+    // OSC 8 links come from terminal output. No open-URL binding exists, so http(s) links are offered as copy-only.
+    linkHandler: { activate: (e, text) => offerLink(text) },
     theme: { background: '#0b0f14', foreground: '#d8dee9', cursor: '#ffcc66' },
   });
   const fit = new FitAddon.FitAddon();

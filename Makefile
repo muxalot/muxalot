@@ -20,7 +20,7 @@ NEXT := $(shell echo $(LAST) | awk -F. -v b=$(BUMP) '{sub(/^v/,"",$$1); if (b=="
 
 GR = $(GRADLE) -q $(GRADLE_FLAGS) -p app -PversionName=$(VERSION) -PversionCode=$(CODE)
 
-.PHONY: help version test agent desktop desktop-assets desktop-test windows deb deb-smoke appimage appimage-smoke apk aab release release-agent release-apk release-desktop release-windows check-gradle check-clean check-tag
+.PHONY: help version test agent xterm-check xterm-update desktop desktop-assets desktop-test windows deb deb-smoke appimage appimage-smoke apk aab release release-agent release-apk release-desktop release-windows check-gradle check-clean check-tag
 .DEFAULT_GOAL := help
 
 help: ## this list
@@ -43,7 +43,20 @@ DESKTOP_VENDOR := xterm.js xterm.css addon-fit.js JetBrainsMonoNerdFontMono-Regu
 # gtk3 = WebKitGTK 4.1 (libgtk-3-dev libwebkit2gtk-4.1-dev); production turns DevTools off
 DESKTOP_TAGS ?= gtk3
 
-desktop-assets: ## copy xterm.js and the font from the Android assets into desktop/frontend/vendor/
+XTERM_VERSION := 6.0.0
+FIT_VERSION := 0.11.0
+ASSETS := app/app/src/main/assets
+
+xterm-check: ## verify the vendored xterm.js/css/addon-fit against xterm.sha256
+	cd $(ASSETS) && sha256sum -c xterm.sha256
+
+xterm-update: ## fetch XTERM_VERSION/FIT_VERSION from npm into the assets and rewrite xterm.sha256 (also edit VENDOR.md)
+	d=$$(mktemp -d) && cd $$d && npm pack --silent @xterm/xterm@$(XTERM_VERSION) @xterm/addon-fit@$(FIT_VERSION) >/dev/null && \
+	  for t in *.tgz; do mkdir $${t%.tgz} && tar xzf $$t -C $${t%.tgz}; done && \
+	  cp xterm-xterm-*/package/lib/xterm.js xterm-xterm-*/package/css/xterm.css xterm-addon-fit-*/package/lib/addon-fit.js $(CURDIR)/$(ASSETS)/ && \
+	  cd $(CURDIR)/$(ASSETS) && sha256sum xterm.js xterm.css addon-fit.js > xterm.sha256; rm -rf $$d
+
+desktop-assets: xterm-check ## copy xterm.js and the font from the Android assets into desktop/frontend/vendor/
 	mkdir -p desktop/frontend/vendor
 	cd app/app/src/main/assets && cp $(DESKTOP_VENDOR) ../../../../../desktop/frontend/vendor/
 

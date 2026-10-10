@@ -2,9 +2,12 @@ package dev.muxalot.ui
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -120,6 +123,25 @@ class TerminalPaneView(
             .show()
     }
 
+    /** OSC 8 links arrive from terminal output: http(s) only, and ask before leaving the app. */
+    private fun confirmLink(url: String) {
+        if (disposed || confirming || Uri.parse(url).scheme?.lowercase() !in listOf("http", "https")) return
+        confirming = true
+        AlertDialog.Builder(context)
+            .setTitle("Open link?")
+            .setMessage(if (url.length > 300) url.take(300) + "…" else url)
+            .setPositiveButton("Open") { _, _ ->
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                } catch (e: ActivityNotFoundException) {
+                    Toast.makeText(context, "No app can open this link", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .setOnDismissListener { confirming = false }
+            .show()
+    }
+
     fun showKeyboard() {
         keys.requestFocus()
         (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
@@ -179,6 +201,11 @@ class TerminalPaneView(
         @JavascriptInterface
         fun onClipboard(text: String) {
             main.post { confirmClipboard(text) }
+        }
+
+        @JavascriptInterface
+        fun onLink(url: String) {
+            main.post { confirmLink(url) }
         }
 
         @JavascriptInterface
