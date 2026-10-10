@@ -339,6 +339,27 @@ func (s *Service) SetClipboard(text string) error {
 	return nil
 }
 
+// webURL accepts only an absolute http(s) URL with a host and no whitespace or control characters.
+func webURL(raw string) error {
+	if len(raw) > 8192 || strings.IndexFunc(raw, func(r rune) bool { return r <= ' ' || r == 0x7f }) >= 0 {
+		return errors.New("not a web link")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("not a web link")
+	}
+	return nil
+}
+
+// OpenURL opens a link from terminal output in the default browser. Output is untrusted,
+// so the scheme is checked here and not only in the frontend.
+func (s *Service) OpenURL(raw string) error {
+	if err := webURL(raw); err != nil {
+		return err
+	}
+	return s.app.Browser.OpenURL(raw)
+}
+
 func (s *Service) Ls(id, remotePath string) (client.LsResult, error) {
 	c, err := s.api(id)
 	if err != nil {

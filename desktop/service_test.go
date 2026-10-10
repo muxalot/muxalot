@@ -12,7 +12,7 @@ import (
 // Every exported method is callable from any script in the webview. Changing this
 // list is a security decision: see the comment on Service.
 func TestBoundSurface(t *testing.T) {
-	want := []string{"Attach", "Detach", "Download", "Forget", "Ls", "Pair", "Paste", "Rename",
+	want := []string{"Attach", "Detach", "Download", "Forget", "Ls", "OpenURL", "Pair", "Paste", "Rename",
 		"Resize", "Send", "Servers", "Sessions", "SetClipboard", "SetTabColor", "TabColors", "Unlock", "Upload"}
 	var got []string
 	typ := reflect.TypeOf(&Service{})
@@ -22,6 +22,20 @@ func TestBoundSurface(t *testing.T) {
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("bound surface changed:\n got  %v\n want %v", got, want)
+	}
+}
+
+func TestWebURL(t *testing.T) {
+	for _, ok := range []string{"http://a.b", "https://example.com/p?q=1#f", "HTTPS://EXAMPLE.COM"} {
+		if err := webURL(ok); err != nil {
+			t.Errorf("webURL(%q) rejected: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "javascript:alert(1)", "file:///etc/passwd", "ftp://a.b", "https://", "//a.b",
+		" https://a.b", "https://a.b/x y", "https://a.b\n--flag", "-https://a.b", "/usr/bin/calc"} {
+		if err := webURL(bad); err == nil {
+			t.Errorf("webURL(%q) accepted", bad)
+		}
 	}
 }
 

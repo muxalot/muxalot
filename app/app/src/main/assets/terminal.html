@@ -15,10 +15,19 @@
 <div id="t"></div>
 <script src="xterm.js"></script>
 <script src="addon-fit.js"></script>
+<script src="addon-web-links.js"></script>
+<script src="addon-unicode11.js"></script>
 <script>
 // Rendering only. All keyboard input is captured natively by the app and sent
 // straight to the WebSocket; this page never takes focus or IME input.
 (function () {
+  // OSC 8 and detected plain URLs both land here. Set before the deferred tap check in touchend.
+  let linkHit = false;
+  function openLink(text) {
+    if (!/^https?:\/\//i.test(text)) return;
+    linkHit = true;
+    Android.onLink(text);
+  }
   const term = new Terminal({
     fontFamily: '"JetBrainsMono NFM", monospace',
     fontSize: 14,
@@ -26,13 +35,14 @@
     scrollback: 1000,
     allowProposedApi: true,
     // OSC 8 hyperlinks come from terminal output; only http(s) goes to the app, which asks first.
-    linkHandler: {
-      activate(e, text) { if (/^https?:\/\//i.test(text)) Android.onLink(text); },
-    },
+    linkHandler: { activate: (e, text) => openLink(text) },
     theme: { background: '#0b0f14', foreground: '#d8dee9', cursor: '#ffcc66' },
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
+  term.loadAddon(new Unicode11Addon.Unicode11Addon());
+  term.unicode.activeVersion = '11';
+  term.loadAddon(new WebLinksAddon.WebLinksAddon((e, text) => openLink(text)));
   const host = document.getElementById('t');
   term.open(host);
 
@@ -158,7 +168,10 @@
       const s = term.getSelection();
       if (s) Android.onSelection(s);
     } else if (!moved) {
-      Android.onTap();
+      // ponytail: xterm fires the link click from a synthesized mouse event just after touchend; 50ms wait,
+      // replace with a cell hit-test if that ever races.
+      linkHit = false;
+      setTimeout(() => { if (!linkHit) Android.onTap(); }, 50);
     }
     t0 = null; selecting = false;
   });

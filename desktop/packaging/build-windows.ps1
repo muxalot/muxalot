@@ -25,7 +25,7 @@ if (-not $Version) {
 $assets = Join-Path $root 'app\app\src\main\assets'
 $vendor = Join-Path $root 'desktop\frontend\vendor'
 New-Item -ItemType Directory -Force $vendor | Out-Null
-foreach ($f in 'xterm.js', 'xterm.css', 'addon-fit.js', 'JetBrainsMonoNerdFontMono-Regular.woff2', 'LICENSE-xterm.txt', 'LICENSE-nerdfonts.txt') {
+foreach ($f in 'xterm.js', 'xterm.css', 'addon-fit.js', 'addon-web-links.js', 'addon-unicode11.js', 'JetBrainsMonoNerdFontMono-Regular.woff2', 'LICENSE-xterm.txt', 'LICENSE-nerdfonts.txt') {
 	Copy-Item "$assets\$f" $vendor
 }
 

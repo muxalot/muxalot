@@ -32,7 +32,7 @@
           # Run from desktop/ (modRoot), hence the ../app path.
           preBuild = ''
             mkdir -p frontend/vendor
-            for f in xterm.js xterm.css addon-fit.js \
+            for f in xterm.js xterm.css addon-fit.js addon-web-links.js addon-unicode11.js \
               JetBrainsMonoNerdFontMono-Regular.woff2 \
               LICENSE-xterm.txt LICENSE-nerdfonts.txt; do
               cp ../app/app/src/main/assets/$f frontend/vendor/

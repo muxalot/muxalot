@@ -39,22 +39,24 @@ agent: ## cross-compile the agent (linux amd64+arm64) into dist/
 	    -o ../$(DIST)/muxalot-agent-linux-$$a . || exit 1; done
 	cd $(DIST) && sha256sum muxalot-agent-linux-* > SHA256SUMS
 
-DESKTOP_VENDOR := xterm.js xterm.css addon-fit.js JetBrainsMonoNerdFontMono-Regular.woff2 LICENSE-xterm.txt LICENSE-nerdfonts.txt
+DESKTOP_VENDOR := xterm.js xterm.css addon-fit.js addon-web-links.js addon-unicode11.js JetBrainsMonoNerdFontMono-Regular.woff2 LICENSE-xterm.txt LICENSE-nerdfonts.txt
 # gtk3 = WebKitGTK 4.1 (libgtk-3-dev libwebkit2gtk-4.1-dev); production turns DevTools off
 DESKTOP_TAGS ?= gtk3
 
 XTERM_VERSION := 6.0.0
 FIT_VERSION := 0.11.0
+WEBLINKS_VERSION := 0.12.0
+UNICODE11_VERSION := 0.9.0
 ASSETS := app/app/src/main/assets
 
 xterm-check: ## verify the vendored xterm.js/css/addon-fit against xterm.sha256
 	cd $(ASSETS) && sha256sum -c xterm.sha256
 
-xterm-update: ## fetch XTERM_VERSION/FIT_VERSION from npm into the assets and rewrite xterm.sha256 (also edit VENDOR.md)
-	d=$$(mktemp -d) && cd $$d && npm pack --silent @xterm/xterm@$(XTERM_VERSION) @xterm/addon-fit@$(FIT_VERSION) >/dev/null && \
+xterm-update: ## fetch the *_VERSION pins from npm into the assets and rewrite xterm.sha256 (also edit VENDOR.md)
+	d=$$(mktemp -d) && cd $$d && npm pack --silent @xterm/xterm@$(XTERM_VERSION) @xterm/addon-fit@$(FIT_VERSION) @xterm/addon-web-links@$(WEBLINKS_VERSION) @xterm/addon-unicode11@$(UNICODE11_VERSION) >/dev/null && \
 	  for t in *.tgz; do mkdir $${t%.tgz} && tar xzf $$t -C $${t%.tgz}; done && \
-	  cp xterm-xterm-*/package/lib/xterm.js xterm-xterm-*/package/css/xterm.css xterm-addon-fit-*/package/lib/addon-fit.js $(CURDIR)/$(ASSETS)/ && \
-	  cd $(CURDIR)/$(ASSETS) && sha256sum xterm.js xterm.css addon-fit.js > xterm.sha256; rm -rf $$d
+	  cp xterm-xterm-*/package/lib/xterm.js xterm-xterm-*/package/css/xterm.css xterm-addon-fit-*/package/lib/addon-fit.js xterm-addon-web-links-*/package/lib/addon-web-links.js xterm-addon-unicode11-*/package/lib/addon-unicode11.js $(CURDIR)/$(ASSETS)/ && \
+	  cd $(CURDIR)/$(ASSETS) && sha256sum xterm.js xterm.css addon-fit.js addon-web-links.js addon-unicode11.js > xterm.sha256; rm -rf $$d
 
 desktop-assets: xterm-check ## copy xterm.js and the font from the Android assets into desktop/frontend/vendor/
 	mkdir -p desktop/frontend/vendor
