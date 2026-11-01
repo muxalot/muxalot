@@ -58,12 +58,12 @@ jobs:
       - name: Checksum (AppImage)
         id: appimage
         run: echo "sha256=$(sha256sum dist/muxalot-desktop_*.AppImage | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-deb
           path: dist/muxalot-desktop_*.deb
           if-no-files-found: error
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-appimage
           path: dist/muxalot-desktop_*.AppImage
@@ -138,7 +138,7 @@ jobs:
         run: |
           $h = (Get-FileHash -Algorithm SHA256 "dist\muxalot-desktop_*_windows-amd64.zip").Hash
           Add-Content -Path $env:GITHUB_OUTPUT -Value "sha256=$($h.ToLower())"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-zip
           path: dist/muxalot-desktop_*_windows-amd64.zip
