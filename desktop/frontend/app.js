@@ -2,6 +2,7 @@
 // fixed Service surface (service.go). Server-supplied text is only ever placed
 // with textContent, never as HTML.
 import { Call, Events } from '/wails/runtime.js';
+import { attachTab } from './attach.js';
 
 const call = (m, ...a) => Call.ByName('main.Service.' + m, ...a);
 const $ = (id) => document.getElementById(id);
@@ -206,8 +207,7 @@ async function openTab(name) {
     fitTab(t);
   });
   try {
-    await call('Attach', t.server, name, term.cols, term.rows);
-    t.attached = true;
+    await attachTab(t, call, fitTab);
   } catch (e) {
     fail(e);
   }
