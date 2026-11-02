@@ -264,3 +264,35 @@ func (c *Client) Ls(path string) (LsResult, error) {
 	err := c.getJSON(c.endpoint("/ls", url.Values{"path": {path}}), &out)
 	return out, err
 }
+
+// UpdateInfo is the agent's own update status (GET /update).
+type UpdateInfo struct {
+	Current   string `json:"current"`
+	Latest    string `json:"latest"`
+	Available bool   `json:"available"`
+	URL       string `json:"url"`
+	Notes     string `json:"notes"`
+	Applying  bool   `json:"applying"`
+	LastError string `json:"last_error"`
+}
+
+func (c *Client) UpdateStatus() (UpdateInfo, error) {
+	var out UpdateInfo
+	err := c.getJSON(c.endpoint("/update", nil), &out)
+	return out, err
+}
+
+// ApplyUpdate asks the agent to install its latest release (202); 409/501 explain why not.
+func (c *Client) ApplyUpdate() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	resp, err := c.do(ctx, http.MethodPost, c.endpoint("/update/apply", nil), nil, 0)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return apiError(resp)
+	}
+	return nil
+}

@@ -12,8 +12,9 @@ import (
 // Every exported method is callable from any script in the webview. Changing this
 // list is a security decision: see the comment on Service.
 func TestBoundSurface(t *testing.T) {
-	want := []string{"Attach", "Detach", "Download", "Forget", "Ls", "OpenURL", "Pair", "Paste", "Rename",
-		"Resize", "Send", "Servers", "Sessions", "SetClipboard", "SetTabColor", "TabColors", "Unlock", "Upload"}
+	want := []string{"ApplyAgentUpdate", "ApplyDesktopUpdate", "Attach", "Detach", "Download", "Forget", "Ls", "OpenURL",
+		"Pair", "Paste", "Rename", "Resize", "Send", "Servers", "Sessions", "SetClipboard", "SetTabColor", "TabColors",
+		"Unlock", "UpdateStatus", "Upload"}
 	var got []string
 	typ := reflect.TypeOf(&Service{})
 	for i := 0; i < typ.NumMethod(); i++ {

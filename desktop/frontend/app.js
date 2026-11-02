@@ -436,6 +436,7 @@ async function unlockPrompt(id) {
 
 async function loadServer(id) {
   cur = id;
+  checkUpdates();
   $('server').value = id;
   for (const t of tabs.values()) t.el.style.display = 'none';
   let names = [];
@@ -608,8 +609,63 @@ Events.On('xfer:progress', (ev) => {
   $('f-status').textContent = `${d.name}: ${d.total > 0 ? Math.floor(100 * d.done / d.total) + '%' : d.done + ' B'}`;
 });
 
+// ---------------------------------------------------------------- updates
+const dismissed = (k, v) => localStorage.getItem('upd.' + k) === v;
+
+function updateRow(text, actions, dismissKey, version) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  const span = document.createElement('span');
+  span.textContent = text;
+  row.append(span);
+  for (const [label, fn] of [...actions, ['Dismiss', () => { localStorage.setItem('upd.' + dismissKey, version); checkUpdates(); }]]) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    row.append(b);
+  }
+  $('update-bar').append(row);
+}
+
+async function checkUpdates() {
+  let r;
+  try { r = await call('UpdateStatus', cur || ''); } catch { return; } // offline or rate-limited: next round
+  const bar = $('update-bar');
+  bar.replaceChildren();
+  const d = r.desktop;
+  if (d.available && !dismissed('desktop', d.latest)) {
+    const act = d.canApply
+      ? ['Update', () => call('ApplyDesktopUpdate').catch(fail)] // restarts into the new version on success
+      : ['View release', () => call('OpenURL', d.url).catch(fail)];
+    updateRow(`muxalot ${d.latest} is available`, [act], 'desktop', d.latest);
+  }
+  const a = r.agent;
+  if (a && a.available && !dismissed('agent:' + cur, a.latest)) {
+    const text = a.last_error ? `Server update ${a.latest} failed: ${a.last_error}` : `Server update ${a.latest} is available`;
+    updateRow(text, [['Update server', () => applyAgent(a.latest)]], 'agent:' + cur, a.latest);
+  }
+  bar.hidden = !bar.children.length;
+}
+
+async function applyAgent(latest) {
+  try { await call('ApplyAgentUpdate', cur); } catch (e) { return fail(e); }
+  banner('Updating the server...');
+  for (let i = 0; i < 30; i++) { // the agent restarts: poll until it reports the new version
+    await new Promise((r) => setTimeout(r, 3000));
+    try {
+      const r = await call('UpdateStatus', cur);
+      if (r.agent && r.agent.current.replace(/^v/, '') === latest.replace(/^v/, '')) { banner('Server updated to ' + latest); return checkUpdates(); }
+      if (r.agent && r.agent.last_error) return fail(new Error(r.agent.last_error));
+    } catch { /* agent is restarting */ }
+  }
+  fail(new Error('Server update did not finish; check the server'));
+}
+
+setInterval(checkUpdates, 6 * 3600 * 1000);
+
 // ---------------------------------------------------------------- start
 (async () => {
+  checkUpdates();
   try {
     servers = await call('Servers');
     fillServers();

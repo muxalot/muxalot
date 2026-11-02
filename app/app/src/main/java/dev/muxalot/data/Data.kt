@@ -169,3 +169,20 @@ class ShortcutStore(ctx: Context) {
         )
     }
 }
+
+/** Last GitHub release seen by this app (checked at most every 6h) and the version the user dismissed. */
+class UpdateState(ctx: Context) {
+    private val prefs = ctx.getSharedPreferences("update", Context.MODE_PRIVATE)
+    var checkedAt: Long
+        get() = prefs.getLong("checked_at", 0)
+        set(v) = prefs.edit().putLong("checked_at", v).apply()
+    var tag: String
+        get() = prefs.getString("tag", "") ?: ""
+        set(v) = prefs.edit().putString("tag", v).apply()
+    var url: String
+        get() = prefs.getString("url", "") ?: ""
+        set(v) = prefs.edit().putString("url", v).apply()
+    var dismissed: String
+        get() = prefs.getString("dismissed", "") ?: ""
+        set(v) = prefs.edit().putString("dismissed", v).apply()
+}

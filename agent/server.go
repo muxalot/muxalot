@@ -42,6 +42,7 @@ type Server struct {
 	maxUpload int64
 	lim       *limiter
 	nonces    *nonceCache
+	up        *Updater // nil when self-update is off
 }
 
 func NewServer(st *Store, filesRoot string, maxUploadMB int64) (*Server, error) {
@@ -63,6 +64,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /sessions", s.auth(s.handleSessions))
 	mux.HandleFunc("DELETE /sessions/{name}", s.auth(s.handleKill))
 	mux.HandleFunc("POST /sessions/{name}/rename", s.auth(s.handleRename))
+	mux.HandleFunc("GET /update", s.auth(s.handleUpdate))
+	mux.HandleFunc("POST /update/apply", s.auth(s.handleUpdateApply))
 	mux.HandleFunc("GET /ls", s.auth(s.handleLs))
 	mux.HandleFunc("GET /files", s.auth(s.handleDownload))
 	mux.HandleFunc("PUT /files", s.auth(s.handleUpload))
@@ -547,6 +550,32 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.up == nil {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.up.Status())
+}
+
+func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	if s.up == nil {
+		http.NotFound(w, r)
+		return
+	}
+	tag, err := s.up.Request()
+	switch {
+	case errors.Is(err, errNoUpdate), errors.Is(err, errApplying):
+		http.Error(w, err.Error(), http.StatusConflict)
+	case errors.Is(err, errNotInstalled):
+		http.Error(w, err.Error(), http.StatusNotImplemented)
+	case err != nil:
+		http.Error(w, "update request failed", http.StatusInternalServerError)
+	default:
+		writeJSON(w, http.StatusAccepted, map[string]string{"tag": tag})
+	}
 }
 
 // ---------- files ----------

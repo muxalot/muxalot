@@ -38,6 +38,30 @@ WantedBy=multi-user.target
 `, user, listen, filesRoot, installBin)
 }
 
+// updateUnits returns the root-side self-update units, keyed by path. PathExists (not
+// PathChanged) so a request left by a crash still fires on boot; apply-update deletes it first.
+func updateUnits() map[string]string {
+	return map[string]string{
+		"/etc/systemd/system/muxalot-agent-update.path": `[Unit]
+Description=muxalot-agent self-update request
+
+[Path]
+PathExists=` + updDir + `/request
+Unit=muxalot-agent-update.service
+
+[Install]
+WantedBy=multi-user.target
+`,
+		"/etc/systemd/system/muxalot-agent-update.service": `[Unit]
+Description=muxalot-agent self-update
+
+[Service]
+Type=oneshot
+ExecStart=` + installBin + ` apply-update --update-dir ` + updDir + `
+`,
+	}
+}
+
 // proxyConfig returns a reverse-proxy snippet for the agent. Every variant must
 // keep the request path untouched (the signature covers it), pass WebSocket
 // upgrades, send X-Forwarded-For, and not buffer file streams.
@@ -189,7 +213,19 @@ func runInstall(user, listen, filesRoot string) {
 	if err := os.WriteFile(installUnit, []byte(unitFile(user, listen, filesRoot)), 0o644); err != nil {
 		log.Fatal(err)
 	}
-	for _, args := range [][]string{{"daemon-reload"}, {"enable", "--now", "muxalot-agent"}} {
+	// self-update: the agent files a request in updDir; the root path unit below installs it
+	if err := os.MkdirAll(updDir, 0o750); err != nil {
+		log.Fatal(err)
+	}
+	if err := run("chown", user+":", updDir); err != nil {
+		log.Fatal(err)
+	}
+	for path, body := range updateUnits() {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			log.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{{"daemon-reload"}, {"enable", "--now", "muxalot-agent", "muxalot-agent-update.path"}} {
 		if err := run("systemctl", args...); err != nil {
 			log.Fatal(err)
 		}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -28,7 +29,8 @@ Usage:
   muxalot-agent revoke  ID [--data DIR]                               revoke a device
   muxalot-agent install [--user NAME] [--listen ADDR] [--files-root DIR]   (root) install binary + systemd unit
   muxalot-agent proxy   --type caddy|nginx|apache --domain HOST [--upstream ADDR]   print a reverse-proxy snippet
-  muxalot-agent version                                               print the release version
+  muxalot-agent apply-update [--update-dir DIR]                       (root) install the release named in DIR/request
+  muxalot-agent version                                             print the release version
 `)
 	os.Exit(2)
 }
@@ -51,6 +53,7 @@ func main() {
 	home, _ := os.UserHomeDir()
 	root := fs.String("files-root", home, "directory tree exposed to upload/download")
 	maxUp := fs.Int64("max-upload-mb", 2048, "max upload size in MiB")
+	updateDir := fs.String("update-dir", updDir, "self-update request directory, empty disables (serve, apply-update)")
 	name := fs.String("name", "", "device name (add-key)")
 	pubURL := fs.String("url", "", "public https URL of this server (for pair)")
 	svcUser := fs.String("user", "", "service user (install; asked interactively if unset)")
@@ -75,6 +78,9 @@ func main() {
 	switch cmd {
 	case "version":
 		fmt.Println(version)
+		return
+	case "apply-update":
+		runApplyUpdate(*updateDir)
 		return
 	case "install":
 		filesRoot := "" // default to the service user's home, not root's
@@ -110,6 +116,10 @@ func main() {
 		srv, err := NewServer(st, *root, *maxUp)
 		if err != nil {
 			log.Fatal(err)
+		}
+		if *updateDir != "" {
+			srv.up = NewUpdater(version, *updateDir)
+			go srv.up.Run(context.Background())
 		}
 		hs := &http.Server{
 			Addr:              *listen,

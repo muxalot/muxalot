@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -20,6 +21,7 @@ import (
 	"muxalot-desktop/internal/client"
 	"muxalot-desktop/internal/config"
 	"muxalot-desktop/internal/keystore"
+	"muxalot-desktop/internal/update"
 )
 
 // Service is the only app-defined surface the webview can call. Every exported
@@ -501,4 +503,51 @@ func (f *feed) flush() {
 		f.emit(b[:n])
 		b = b[n:]
 	}
+}
+
+// UpdateStatusOut is what the update bar shows: this app's status plus, when a server
+// is selected and new enough to answer, the server's.
+type UpdateStatusOut struct {
+	Desktop update.Info        `json:"desktop"`
+	Agent   *client.UpdateInfo `json:"agent"`
+}
+
+// UpdateStatus checks GitHub for the desktop and asks the server for its own status.
+// A failed GitHub check is an error; an old agent without /update just yields no agent part.
+func (s *Service) UpdateStatus(serverID string) (UpdateStatusOut, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	d, err := update.Check(ctx, &http.Client{}, update.API, version)
+	if err != nil {
+		return UpdateStatusOut{}, err
+	}
+	out := UpdateStatusOut{Desktop: d}
+	if c, err := s.api(serverID); err == nil {
+		if a, err := c.UpdateStatus(); err == nil {
+			out.Agent = &a
+		}
+	}
+	return out, nil
+}
+
+// ApplyDesktopUpdate downloads, verifies and swaps this app's binary, then restarts into it.
+// It re-checks GitHub itself so the page cannot name a version or URL.
+func (s *Service) ApplyDesktopUpdate() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	hc := &http.Client{}
+	d, err := update.Check(ctx, hc, update.API, version)
+	if err != nil {
+		return err
+	}
+	return update.Apply(ctx, hc, update.Download, d)
+}
+
+// ApplyAgentUpdate asks the server to update itself.
+func (s *Service) ApplyAgentUpdate(serverID string) error {
+	c, err := s.api(serverID)
+	if err != nil {
+		return err
+	}
+	return c.ApplyUpdate()
 }

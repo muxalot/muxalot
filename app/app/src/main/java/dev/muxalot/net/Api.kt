@@ -120,6 +120,18 @@ class Api(private val server: Server) {
         client.newCall(request("POST", url("sessions", from, "rename"), body)).execute().use { check(it) }
     }
 
+    /** The agent's own update status (404 from an agent that predates self-update). */
+    fun update(): UpdateInfo =
+        client.newCall(request("GET", url("update"))).execute().use { r ->
+            check(r)
+            json.decodeFromString(r.text())
+        }
+
+    /** Asks the agent to install its latest release; 409 = nothing to do or already running, 501 = installer not re-run. */
+    fun applyUpdate() {
+        client.newCall(request("POST", url("update", "apply"), "".toRequestBody(null))).execute().use { check(it) }
+    }
+
     fun ls(path: String): LsResult =
         client.newCall(request("GET", url("ls", query = mapOf("path" to path)))).execute().use { r ->
             check(r)
@@ -169,5 +181,39 @@ class Api(private val server: Server) {
         val longClient = client.newBuilder().writeTimeout(0, TimeUnit.MILLISECONDS)
             .readTimeout(120, TimeUnit.SECONDS).build()
         longClient.newCall(request("PUT", url("files", query = q), body)).execute().use { check(it) }
+    }
+}
+
+@Serializable
+data class UpdateInfo(
+    val current: String = "",
+    val latest: String = "",
+    val available: Boolean = false,
+    val applying: Boolean = false,
+    val last_error: String = "",
+)
+
+/** The newest stable GitHub release; the app only links to it (updates come from the release page, or Play for the pro edition). */
+object Release {
+    private fun parse(s: String): List<Int>? =
+        s.removePrefix("v").split(".").takeIf { it.size == 3 }?.map { it.toIntOrNull() ?: return null }
+
+    /** "dev" and "x.y.z-dev" builds never count as outdated. */
+    fun newer(latest: String, cur: String): Boolean {
+        val l = parse(latest) ?: return false
+        val c = parse(cur) ?: return false
+        for (i in 0..2) if (l[i] != c[i]) return l[i] > c[i]
+        return false
+    }
+
+    /** Returns (tag, page url). */
+    fun fetchLatest(): Pair<String, String> {
+        val req = Request.Builder().url("https://api.github.com/repos/muxalot/muxalot/releases/latest")
+            .header("Accept", "application/vnd.github+json").build()
+        Api.client.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) throw ApiException(r.code, "GitHub: HTTP ${r.code}")
+            val j = JSONObject(r.text())
+            return j.getString("tag_name") to j.getString("html_url")
+        }
     }
 }

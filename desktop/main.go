@@ -18,6 +18,7 @@ import (
 
 	"muxalot-desktop/internal/config"
 	"muxalot-desktop/internal/keystore"
+	"muxalot-desktop/internal/update"
 )
 
 var version = "dev"
@@ -56,6 +57,7 @@ func main() {
 		fatal("cannot start, missing requirements", problems)
 	}
 
+	update.CleanupOld()
 	dir, err := config.Dir()
 	if err != nil {
 		log.Fatal(err)
