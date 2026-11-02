@@ -1,5 +1,6 @@
 package dev.muxalot.ui
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
@@ -62,10 +63,14 @@ import dev.muxalot.ui.kit.ScreenHeader
 import dev.muxalot.ui.theme.Mux
 import dev.muxalot.data.Server
 import dev.muxalot.data.ServerStore
+import dev.muxalot.data.UpdateState
+import dev.muxalot.net.Release
+import dev.muxalot.net.UpdateInfo
 import dev.muxalot.net.Api
 import dev.muxalot.net.ApiException
 import dev.muxalot.net.FileEntry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -77,6 +82,47 @@ import java.util.UUID
 fun ServerListScreen(store: ServerStore, onSettings: () -> Unit, onOpen: (Server) -> Unit, onAdd: () -> Unit) {
     var servers by remember { mutableStateOf(store.load()) }
     var deleting by remember { mutableStateOf<Server?>(null) }
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val upd = remember { UpdateState(ctx) }
+    var tag by remember { mutableStateOf(upd.tag) }
+    var dismissed by remember { mutableStateOf(upd.dismissed) }
+    var agent by remember { mutableStateOf<Map<String, UpdateInfo>>(emptyMap()) }
+    var updating by remember { mutableStateOf(setOf<String>()) }
+    var note by remember { mutableStateOf<String?>(null) }
+
+    // The app's own update: GitHub at most every 6h. The pro edition updates through Play, so it never checks.
+    LaunchedEffect(Unit) {
+        if (Edition.isPro || System.currentTimeMillis() - upd.checkedAt < 6 * 3600_000L) return@LaunchedEffect
+        runCatching { withContext(Dispatchers.IO) { Release.fetchLatest() } }.onSuccess { (t, u) ->
+            upd.tag = t; upd.url = u; upd.checkedAt = System.currentTimeMillis(); tag = t
+        }
+    }
+    // Each server's own update status; an agent without /update (404) or an unreachable one is skipped.
+    LaunchedEffect(servers) {
+        for (s in servers) runCatching { withContext(Dispatchers.IO) { Api(s).update() } }.onSuccess { agent = agent + (s.id to it) }
+    }
+
+    fun applyAgent(s: Server) {
+        updating = updating + s.id
+        note = null
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { Api(s).applyUpdate() }
+                for (i in 0 until 30) { // the agent restarts; poll until it reports the new version
+                    delay(3000)
+                    val u = runCatching { withContext(Dispatchers.IO) { Api(s).update() } }.getOrNull() ?: continue
+                    agent = agent + (s.id to u)
+                    if (!u.available || u.last_error.isNotEmpty()) break
+                }
+            } catch (e: Exception) {
+                note = e.message ?: e.javaClass.simpleName
+            } finally {
+                updating = updating - s.id
+            }
+        }
+    }
+
     Scaffold { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             ScreenHeader(
@@ -84,6 +130,14 @@ fun ServerListScreen(store: ServerStore, onSettings: () -> Unit, onOpen: (Server
                 leading = { Image(painterResource(R.drawable.logo_mark), null, Modifier.size(32.dp)) },
                 actions = { RoundIconButton(MuxIcons.Plus, "Add server", onAdd) },
             )
+            if (!Edition.isPro && tag != dismissed && upd.url.startsWith("https://github.com/") && Release.newer(tag, BuildConfig.VERSION_NAME)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Muxalot $tag is available", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(upd.url))) }) { Text("View") }
+                    TextButton(onClick = { upd.dismissed = tag; dismissed = tag }) { Text("Dismiss") }
+                }
+            }
+            note?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
             if (servers.isEmpty()) {
                 Column(
                     Modifier.weight(1f).fillMaxWidth().padding(24.dp),
@@ -109,6 +163,15 @@ fun ServerListScreen(store: ServerStore, onSettings: () -> Unit, onOpen: (Server
                                 Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                                     Text(s.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(s.url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    agent[s.id]?.takeIf { it.available }?.let { u ->
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                if (u.last_error.isNotEmpty()) "Update ${u.latest} failed: ${u.last_error}" else "Update ${u.latest} available",
+                                                Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
+                                            )
+                                            TextButton(enabled = s.id !in updating, onClick = { applyAgent(s) }) { Text(if (s.id in updating) "Updating…" else "Update") }
+                                        }
+                                    }
                                 }
                                 TextButton(onClick = { deleting = s }) { Text("Remove") }
                             }

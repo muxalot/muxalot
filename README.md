@@ -87,6 +87,12 @@ Recommended `~muxalot-agent/.tmux.conf`: `set -g mouse on` (swipe-to-scroll in t
 
 Files: uploads/downloads are confined to `--files-root` (default: the agent user's home), symlink-safe, size-capped by `--max-upload-mb`. New uploads are created `0600`. The confinement guards the file endpoints, not a paired device: a paired device already has a shell as the agent's user.
 
+### Updates
+
+The agent checks GitHub's latest stable release on start and every 6 hours. The desktop app and the Android app (free edition; Play updates the pro edition) check too and show a banner; the apps also show the server's status, with an **Update** button. Applying an agent update files a request that a root systemd unit (`muxalot-agent-update.path`) acts on: it downloads the release binary and `SHA256SUMS` itself, verifies the checksum, swaps `/usr/local/bin/muxalot-agent` and restarts the service. The agent user never writes its own binary. Hosts installed before this feature need `install.sh` re-run once to get the units; until then the Update button answers 501. `--update-dir ""` turns the agent's check off.
+
+The desktop AppImage and Windows exe replace themselves and restart; the `.deb` only links to the release.
+
 ## Android app
 
 Open `app/` in Android Studio (the Gradle wrapper isn't included; Studio creates one, or run `gradle wrapper`). minSdk 26.

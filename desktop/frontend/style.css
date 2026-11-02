@@ -72,3 +72,6 @@ header { display: flex; gap: 8px; align-items: center; padding: 6px 8px; backgro
 #tabmenu .sw { display: flex; gap: 8px; align-items: center; text-align: left; padding: 6px 12px; border: 0; border-radius: 4px; background: none; cursor: pointer; }
 #tabmenu .sw:hover { background: #232c39; }
 #tabmenu .sw .chip { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
+#update-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 19; display: grid; }
+#update-bar .row { display: flex; gap: 8px; align-items: center; padding: 6px 14px; background: #12303b; color: var(--fg, #dde); border-top: 1px solid var(--line); }
+#update-bar .row span { flex: 1; }
