@@ -215,16 +215,22 @@ fun TerminalScreen(server: Server, onFiles: () -> Unit, onShortcuts: () -> Unit,
                 }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                ctrl.tabs.forEach { name ->
-                    key(name) {
-                        TerminalPane(
-                            conn = ctrl.conn(name),
-                            enc = ctrl.enc(name),
-                            visible = name == ctrl.selected,
-                            fontSize = fontSize,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                // the dock's bar overlays the bottom BAR dp; reserve it so tmux rows end above it
+                Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        ctrl.tabs.forEach { name ->
+                            key(name) {
+                                TerminalPane(
+                                    conn = ctrl.conn(name),
+                                    enc = ctrl.enc(name),
+                                    visible = name == ctrl.selected,
+                                    fontSize = fontSize,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
                     }
+                    if (ctrl.selected != null) Spacer(Modifier.height(BAR.dp))
                 }
                 if (ctrl.tabs.isEmpty()) {
                     Text("No sessions. Tap +.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
